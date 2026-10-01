@@ -3,10 +3,11 @@
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+LOCAL_TZ = timezone(timedelta(hours=8))
 
 
 def read_json(name):
@@ -26,6 +27,31 @@ def read_page_data():
     text = (ROOT / "index.html").read_text(encoding="utf-8")
     match = re.search(r"window\.__A500_PAGE_DATA\s*=\s*(\{.*?\})\s*;", text, re.S)
     return json.loads(match.group(1)) if match else {}
+
+
+def source_generated_at(page, realtime, dividend, transition):
+    values = [
+        page.get("pageCreatedAt"),
+        realtime.get("ts"),
+        dividend.get("update_time"),
+        transition.get("date"),
+    ]
+    parsed = []
+    for value in values:
+        if not value:
+            continue
+        try:
+            text = str(value).replace(" ", "T")
+            if text.endswith("Z"):
+                dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+            else:
+                dt = datetime.fromisoformat(text)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=LOCAL_TZ)
+            parsed.append(dt.astimezone(timezone.utc))
+        except ValueError:
+            continue
+    return max(parsed).isoformat() if parsed else None
 
 
 def main():
@@ -52,7 +78,7 @@ def main():
     payload = {
         "schema_version": 1,
         "source": "a500",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": source_generated_at(page, realtime, dividend, transition),
         "a500": a500,
         "dividend": dividend,
         "transition": transition,
