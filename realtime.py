@@ -188,6 +188,48 @@ def compute(spot, chg, base, market, ts, fresh, live, delayed=False):
     }
 
 
+def snapshot_payload(out: dict, now=None):
+    """Return the small, stable contract consumed by VPush."""
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    ts = out.get("ts")
+    updated = None
+    if ts:
+        try:
+            dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=datetime.timezone(datetime.timedelta(hours=8)))
+            updated = dt.isoformat()
+        except ValueError:
+            pass
+    temperature = out.get("temperature")
+    if isinstance(temperature, (int, float)):
+        temperature_status = "cold" if temperature < 30 else "normal" if temperature < 60 else "hot" if temperature < 80 else "overheated"
+    else:
+        temperature_status = "unavailable"
+    return {
+        "source": "a500",
+        "temperature": temperature,
+        "temperature_raw": out.get("temperatureRaw"),
+        "temperature_status": temperature_status,
+        "price": out.get("price"),
+        "change": out.get("change"),
+        "pe": out.get("pe"),
+        "pe_percentile": out.get("pePercentile"),
+        "price_percentile": out.get("pricePercentile"),
+        "market_status": "live" if out.get("market") else "closed",
+        "fresh": bool(out.get("fresh")),
+        "delayed": bool(out.get("delayed")),
+        "updated_at": updated,
+        "generated_at": now.isoformat(),
+    }
+
+
+def write_snapshot(out: dict):
+    path = os.path.join(DIR, "market_snapshot.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(snapshot_payload(out), f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print(f"   ✅ 写入 {path}")
+
+
 def main():
     print(f"\n{'='*50}")
     print(f"📡 A500 温度计 · 盘中实时")
@@ -235,6 +277,7 @@ def main():
             }
             print(f"   ⚠️ 无今日缓存，回退日频基线温度 {base.get('temperature')}°C")
 
+    write_snapshot(out)
     payload = "window.__RT = " + json.dumps(out, ensure_ascii=False) + ";"
     # 写入仓库内的 realtime_data.js（这是被 GitHub Pages 实际加载的文件）
     for path in (OUT_LOCAL,):
