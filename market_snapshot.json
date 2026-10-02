@@ -8,9 +8,9 @@
   "pe": 16.31,
   "pe_percentile": 17.2,
   "price_percentile": 68.4,
-  "market_status": "live",
+  "market_status": "closed",
   "fresh": true,
   "delayed": false,
-  "updated_at": "2026-10-02T14:51:45+08:00",
-  "generated_at": "2026-10-02T06:51:49.248657+00:00"
+  "updated_at": "2026-10-02T21:31:36+08:00",
+  "generated_at": "2026-10-02T13:31:39.693821+00:00"
 }
