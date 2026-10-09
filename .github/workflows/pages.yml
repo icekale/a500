@@ -4,6 +4,14 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_run:
+    # 数据任务用 GITHUB_TOKEN 推送，不会再触发上面的 push。
+    workflows:
+      - A500 每日收盘更新
+      - A500 红利低波数据更新
+      - A500 盘中实时刷新
+      - A500 经济健康度数据更新
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,6 +24,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
