@@ -85,7 +85,7 @@ def fetch_etf_spot():
     try:
         df = ak.fund_etf_spot_em()
         etf = df[df['代码'] == ETF_CODE]
-        if len(etf) == 0: return None
+        if len(etf) == 0: return fetch_etf_gtimg()
         row = etf.iloc[0]
         out = {
             'price': safe_float(row.get('最新价')),
@@ -104,6 +104,24 @@ def fetch_etf_spot():
         return out
     except Exception as e:
         print(f"  ETF实时抓取失败: {e}")
+        return fetch_etf_gtimg()
+
+def fetch_etf_gtimg():
+    """东方财富被拦时，用腾讯行情补最新价。折溢价拿不到就按 0。"""
+    import requests
+    try:
+        r = requests.get(f'https://qt.gtimg.cn/q=sh{ETF_CODE}', timeout=10,
+                         headers={'User-Agent': 'Mozilla/5.0'})
+        parts = r.text.split('~')
+        price = safe_float(parts[3]) if len(parts) > 3 else None
+        if not price:
+            return None
+        stamp = next((p for p in parts if len(p) == 14 and p.isdigit()), '')
+        update_time = f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:8]} {stamp[8:10]}:{stamp[10:12]}" if stamp else ''
+        print(f"  ETF行情(gtimg): 价格={price}")
+        return {'price': price, 'premium_pct': 0, 'update_time': update_time}
+    except Exception as e:
+        print(f"  ETF行情(gtimg)失败: {e}")
         return None
 
 # ── D. 10年国债利率（利差用） ──
@@ -296,6 +314,11 @@ def main():
                 temp_history.append({'d': d, 't': percentile_rank(pe, pe_hist_list)})
             if dv:
                 div_history.append({'d': d, 'v': dv})
+
+    # ponytail: 核心估值全空就退出，否则失败抓取会把上一份好数据覆盖成 --
+    if cur_pe is None and cur_div is None:
+        print("核心估值缺失，保留上一份 dividend_data.json")
+        sys.exit(1)
 
     # 10. 组装输出
     results = {
