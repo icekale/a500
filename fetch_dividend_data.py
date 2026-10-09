@@ -34,6 +34,58 @@ def safe_float(v):
     try: return float(v)
     except: return None
 
+def load_previous():
+    try:
+        with open(OUTPUT_JSON, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _blank(result):
+    if result is None:
+        return True
+    if isinstance(result, tuple):
+        return all(item is None for item in result)
+    return False
+
+def call_retry(fn, label, tries=3):
+    """直连失败就隔 1.5s、3s 再试。空结果也算失败。"""
+    err = None
+    for i in range(tries):
+        try:
+            result = fn()
+        except Exception as e:
+            err = e
+            result = None
+        if not _blank(result):
+            return result
+        print(f"  {label} 第{i + 1}次未拿到" + (f": {err}" if err else ""))
+        err = None
+        if i + 1 < tries:
+            time.sleep(1.5 * (i + 1))
+    return None
+
+def merge_fallback(prev, bond_yield, etf, pb, roe):
+    """估值没抓到时保留上一份，只覆盖这次确实拿到的行情。"""
+    merged = dict(prev)
+    if bond_yield is not None:
+        merged["bond_yield"] = bond_yield
+        if merged.get("dividend_yield") is not None:
+            merged["spread"] = round(merged["dividend_yield"] - bond_yield, 2)
+    if etf and etf.get("price"):
+        merged["etf_price"] = etf["price"]
+        merged["etf_premium"] = etf.get("premium_pct", 0)
+        merged["etf_update_time"] = etf.get("update_time")
+        if etf.get("volume") is not None:
+            merged["etf_volume"] = etf["volume"]
+        if etf.get("market_value"):
+            merged["etf_size"] = round(etf["market_value"] / 1e8, 2)
+    if pb is not None:
+        merged["pb"] = pb
+    if roe is not None:
+        merged["roe"] = roe
+    return merged
+
 def percentile_rank(value, series):
     if not series or value is None: return 50
     s = sorted(series)
@@ -81,30 +133,64 @@ def fetch_latest_valuation():
         return None, None, None, None
 
 # ── C. ETF实时行情 ──
+def fetch_etf_em():
+    df = ak.fund_etf_spot_em()
+    etf = df[df['代码'] == ETF_CODE]
+    if len(etf) == 0:
+        return None
+    row = etf.iloc[0]
+    out = {
+        'price': safe_float(row.get('最新价')),
+        'iopv': safe_float(row.get('IOPV实时估值')),
+        'premium': safe_float(row.get('基金折价率')),
+        'volume': safe_float(row.get('成交额')),
+        'market_value': safe_float(row.get('总市值')),
+        'update_time': str(row.get('更新时间', '')),
+    }
+    new_price = safe_float(row.get('最新价'))
+    if new_price and out['iopv'] and out['iopv'] > 0:
+        out['premium_pct'] = round((new_price / out['iopv'] - 1) * 100, 2)
+    else:
+        out['premium_pct'] = out.get('premium', 0) if out.get('premium') is not None else 0
+    return out if out.get('price') else None
+
+def fetch_etf_sina():
+    import re
+    import urllib.request
+    code = f"sh{ETF_CODE}"
+    req = urllib.request.Request(
+        f"https://hq.sinajs.cn/list={code}",
+        headers={"User-Agent": "Mozilla/5.0", "Referer": "https://finance.sina.com.cn/"},
+    )
+    raw = urllib.request.urlopen(req, timeout=10).read().decode("gbk", "ignore")
+    matched = re.search(r'="([^"]*)"', raw)
+    if not matched or not matched.group(1):
+        return None
+    parts = matched.group(1).split(",")
+    price = safe_float(parts[3]) if len(parts) > 3 else None
+    if not price:
+        return None
+    day = next((item for item in parts if len(item) == 10 and item[4:5] == "-" and item[7:8] == "-"), "")
+    clock = ""
+    if day:
+        nxt = parts[parts.index(day) + 1] if parts.index(day) + 1 < len(parts) else ""
+        clock = nxt[:5] if ":" in nxt else ""
+    return {"price": price, "premium_pct": 0, "update_time": f"{day} {clock}".strip()}
+
 def fetch_etf_spot():
-    try:
-        df = ak.fund_etf_spot_em()
-        etf = df[df['代码'] == ETF_CODE]
-        if len(etf) == 0: return fetch_etf_gtimg()
-        row = etf.iloc[0]
-        out = {
-            'price': safe_float(row.get('最新价')),
-            'iopv': safe_float(row.get('IOPV实时估值')),
-            'premium': safe_float(row.get('基金折价率')),
-            'volume': safe_float(row.get('成交额')),
-            'market_value': safe_float(row.get('总市值')),
-            'update_time': str(row.get('更新时间', '')),
-        }
-        new_price = safe_float(row.get('最新价'))
-        if new_price and out['iopv'] and out['iopv'] > 0:
-            out['premium_pct'] = round((new_price / out['iopv'] - 1) * 100, 2)
-        else:
-            out['premium_pct'] = out.get('premium', 0) if out.get('premium') is not None else 0
-        print(f"  ETF实时: 价格={out['price']}, 折溢价={out.get('premium_pct')}%, 成交额={out.get('volume')}")
-        return out
-    except Exception as e:
-        print(f"  ETF实时抓取失败: {e}")
-        return fetch_etf_gtimg()
+    # 与盘中脚本相同：东方财富被重置时换域名，不把价格写成空
+    for name, fn in (("东方财富", fetch_etf_em), ("新浪", fetch_etf_sina), ("腾讯", fetch_etf_gtimg)):
+        for attempt in range(2):
+            try:
+                out = fn()
+                if out and out.get("price"):
+                    print(f"  ETF来源: {name} 价格={out['price']}")
+                    return out
+            except Exception as e:
+                print(f"  ETF {name} 失败: {e}")
+            if attempt == 0:
+                time.sleep(0.5)
+    return None
 
 def fetch_etf_gtimg():
     """东方财富被拦时，用腾讯行情补最新价。折溢价拿不到就按 0。"""
@@ -233,13 +319,17 @@ def main():
     print(f"   指数: {INDEX_CODE} · ETF: {ETF_CODE}")
     print("=" * 50)
 
+    prev = load_previous()
+
     # 1. PE历史
     print("\n📡 1. 获取PE历史...")
-    pe_history, _ = fetch_pe_history()
+    pe_pack = call_retry(fetch_pe_history, "PE历史")
+    pe_history, _ = pe_pack if pe_pack else (None, None)
 
     # 2. 最新估值
     print("\n📡 2. 获取最新估值...")
-    cur_pe, cur_div, cur_date, val_df = fetch_latest_valuation()
+    valuation = call_retry(fetch_latest_valuation, "最新估值")
+    cur_pe, cur_div, cur_date, val_df = valuation if valuation else (None, None, None, None)
 
     # 3. ETF实时
     print("\n📡 3. 获取ETF实时...")
@@ -247,21 +337,33 @@ def main():
 
     # 4. 国债利率
     print("\n📡 4. 获取10年国债利率（利差）...")
-    bond_yield = fetch_bond_yield()
+    bond_yield = call_retry(fetch_bond_yield, "国债利率")
     spread = round(cur_div - bond_yield, 2) if cur_div and bond_yield else None
     print(f"  国债利率: {bond_yield}% → 利差: {spread}%")
 
     # 5. PB/ROE
     print("\n📡 5. 计算PB/ROE...")
-    pb, roe = fetch_pb_roe()
+    pb_pack = call_retry(fetch_pb_roe, "PB/ROE", tries=2)
+    pb, roe = pb_pack if pb_pack else (None, None)
+
+    if cur_pe is None and cur_div is None:
+        if prev.get("pe") is None and prev.get("dividend_yield") is None:
+            print("核心估值缺失，且没有上一份")
+            sys.exit(1)
+        print("  估值抓取失败，沿用上一份 PE/股息率")
+        merged = merge_fallback(prev, bond_yield, etf, pb, roe)
+        with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+            json.dump(merged, f, ensure_ascii=False, indent=2)
+        print(f"\n✅ {OUTPUT_JSON}（估值沿用 {merged.get('update_time')}）")
+        return
 
     # 6. 分位
     pe_hist_list = [safe_float(x) for x in pe_history] if pe_history else []
-    pe_pct = percentile_rank(cur_pe, pe_hist_list) if cur_pe and pe_hist_list else 50
+    pe_pct = percentile_rank(cur_pe, pe_hist_list) if cur_pe and pe_hist_list else prev.get("pe_percentile", 50)
     print(f"\n📊 6. PE分位: {pe_pct}%")
 
     div_hist = [safe_float(x) for x in val_df['股息率1'].dropna().tolist()] if val_df is not None and cur_div is not None else []
-    div_pct = percentile_rank(cur_div, div_hist) if div_hist else 50
+    div_pct = percentile_rank(cur_div, div_hist) if div_hist else prev.get("dividend_yield_percentile", 50)
     print(f"  股息率分位: {div_pct}%")
 
     # 7. 趋势判断（60天窗口）
@@ -315,10 +417,27 @@ def main():
             if dv:
                 div_history.append({'d': d, 'v': dv})
 
-    # ponytail: 核心估值全空就退出，否则失败抓取会把上一份好数据覆盖成 --
-    if cur_pe is None and cur_div is None:
-        print("核心估值缺失，保留上一份 dividend_data.json")
-        sys.exit(1)
+    if not temp_history:
+        temp_history = prev.get("temp_history") or []
+    if not div_history:
+        div_history = prev.get("dividend_history") or []
+    pb = pb if pb is not None else prev.get("pb")
+    roe = roe if roe is not None else prev.get("roe")
+    bond_yield = bond_yield if bond_yield is not None else prev.get("bond_yield")
+    if spread is None and cur_div and bond_yield:
+        spread = round(cur_div - bond_yield, 2)
+    etf_price = etf.get("price") if etf else None
+    if etf_price is None:
+        etf_price = prev.get("etf_price")
+        etf_premium = prev.get("etf_premium")
+        etf_volume = prev.get("etf_volume")
+        etf_size = prev.get("etf_size")
+        etf_update_time = prev.get("etf_update_time")
+    else:
+        etf_premium = premium
+        etf_volume = etf.get("volume") if etf.get("volume") is not None else prev.get("etf_volume")
+        etf_size = round(etf["market_value"] / 1e8, 2) if etf.get("market_value") else prev.get("etf_size")
+        etf_update_time = etf.get("update_time")
 
     # 10. 组装输出
     results = {
@@ -328,11 +447,11 @@ def main():
         'roe': roe,
         'bond_yield': bond_yield,
         'spread': spread,
-        'etf_price': etf.get('price') if etf else None,
-        'etf_premium': premium,
-        'etf_volume': etf.get('volume') if etf else None,
-        'etf_size': round(etf.get('market_value', 0) / 1e8, 2) if etf else None,
-        'etf_update_time': etf.get('update_time') if etf else None,
+        'etf_price': etf_price,
+        'etf_premium': etf_premium,
+        'etf_volume': etf_volume,
+        'etf_size': etf_size,
+        'etf_update_time': etf_update_time,
         'light': light, 'light_score': total_score, 'light_label': light_label,
         'light_weights': '6:3:1',
         'trend_blocked': trend_blocked, 'trend_reason': trend_reason,
@@ -345,5 +464,17 @@ def main():
     print(f"\n✅ {OUTPUT_JSON}")
     print(f"   🚦 {emoji} {light_label}{' 🔒' if trend_blocked else ''}")
 
+def _selftest():
+    assert _blank(None) and _blank((None, None)) and _blank((None, None, None, None))
+    assert not _blank((1, None)) and not _blank(1.2)
+    prev = {"pe": 8.33, "dividend_yield": 4.34, "bond_yield": 1.7, "spread": 2.64, "etf_price": 1.1, "update_time": "old"}
+    merged = merge_fallback(prev, 1.69, {"price": 1.195, "premium_pct": 0, "update_time": "2026-10-09 11:02"}, None, None)
+    assert merged["pe"] == 8.33 and merged["etf_price"] == 1.195 and merged["spread"] == 2.65
+    assert merged["update_time"] == "old"
+    print("selftest ok")
+
 if __name__ == '__main__':
-    main()
+    if os.environ.get("DIVIDEND_SELFTEST"):
+        _selftest()
+    else:
+        main()
