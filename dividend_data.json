@@ -1,30 +1,26 @@
 {
-  "pe": 8.49,
-  "pe_date": "2026-10-12",
+  "pe": 8.53,
+  "pe_date": "2026-10-13",
   "pe_percentile": 90,
-  "dividend_yield": 4.26,
-  "dividend_yield_date": "2026-10-12",
-  "dividend_yield_percentile": 15,
+  "dividend_yield": 4.24,
+  "dividend_yield_date": "2026-10-13",
+  "dividend_yield_percentile": 5,
   "pb": 0.95,
   "roe": 11.6,
-  "bond_yield": 1.6722,
-  "spread": 2.59,
-  "etf_price": 1.208,
-  "etf_premium": 0,
-  "etf_volume": null,
-  "etf_size": null,
-  "etf_update_time": "2026-10-12 15:34",
+  "bond_yield": 1.6654,
+  "spread": 2.57,
+  "etf_price": 1.204,
+  "etf_premium": 0.14,
+  "etf_volume": 379220936.0,
+  "etf_size": 124.64,
+  "etf_update_time": "2026-10-13 16:12:00+08:00",
   "light": "red",
-  "light_score": 25,
+  "light_score": 16,
   "light_label": "观望/减仓",
   "light_weights": "6:3:1",
   "trend_blocked": false,
   "trend_reason": "PE趋势平稳",
   "temp_history": [
-    {
-      "d": "2026-09-15",
-      "t": 90
-    },
     {
       "d": "2026-09-16",
       "t": 89
@@ -100,13 +96,13 @@
     {
       "d": "2026-10-12",
       "t": 90
+    },
+    {
+      "d": "2026-10-13",
+      "t": 90
     }
   ],
   "dividend_history": [
-    {
-      "d": "2026-09-15",
-      "v": 4.24
-    },
     {
       "d": "2026-09-16",
       "v": 4.27
@@ -182,7 +178,11 @@
     {
       "d": "2026-10-12",
       "v": 4.26
+    },
+    {
+      "d": "2026-10-13",
+      "v": 4.24
     }
   ],
-  "update_time": "2026-10-13 01:04"
+  "update_time": "2026-10-13 23:20"
 }
