@@ -3,14 +3,14 @@
   "temperature": 35,
   "temperature_raw": 33,
   "temperature_status": "normal",
-  "price": 5063.8,
-  "change": 0.13,
-  "pe": 15.82,
+  "price": 5091.6,
+  "change": 0.55,
+  "pe": 15.91,
   "pe_percentile": 12.7,
-  "price_percentile": 62.9,
-  "market_status": "closed",
+  "price_percentile": 64.1,
+  "market_status": "live",
   "fresh": true,
   "delayed": false,
-  "updated_at": "2026-10-16T20:37:48+08:00",
-  "generated_at": "2026-10-16T12:37:52.575184+00:00"
+  "updated_at": "2026-10-19T13:55:33+08:00",
+  "generated_at": "2026-10-19T05:55:37.049600+00:00"
 }
