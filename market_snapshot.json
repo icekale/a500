@@ -6,11 +6,11 @@
   "price": 5057.9,
   "change": -0.24,
   "pe": 15.85,
-  "pe_percentile": 12.6,
+  "pe_percentile": 13.1,
   "price_percentile": 62.6,
   "market_status": "closed",
   "fresh": true,
   "delayed": false,
-  "updated_at": "2026-10-20T18:28:19+08:00",
-  "generated_at": "2026-10-20T10:28:24.146190+00:00"
+  "updated_at": "2026-10-20T20:51:10+08:00",
+  "generated_at": "2026-10-20T12:51:16.223220+00:00"
 }
