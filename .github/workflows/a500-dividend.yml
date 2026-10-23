@@ -31,6 +31,9 @@ jobs:
       - name: 安装依赖
         run: pip install akshare numpy pandas requests
 
+      - name: 自检走势与回退
+        run: DIVIDEND_SELFTEST=1 python fetch_dividend_data.py
+
       - name: 抓取红利低波数据
         run: python fetch_dividend_data.py
         env:
@@ -43,7 +46,7 @@ jobs:
         run: |
           git config user.name 'a500-bot'
           git config user.email 'a500-bot@users.noreply.github.com'
-          git add dividend_data.json vpush_data.json
+          git add dividend_data.json dividend_yield_history.json vpush_data.json
           if git diff --cached --quiet; then
             echo "无变化，跳过提交"
             exit 0

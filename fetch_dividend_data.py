@@ -12,10 +12,16 @@ v3 变化：
   - 利差（股息率-国债利率）动态抓取
   - 趋势保护窗口从20天改为60天
   - 连续打分 6:3:1 权重
+
+走势长度：
+  - temp_history：滚动市盈率按日分位后降到周频，窗口约 2 年。
+    分位样本与红绿灯相同（2018-05-26 ~ 2024-06-04 的滚动市盈率）。
+  - dividend_history：中证估值 xls 只有近月股息率。官方长历史接口没有
+    股息率字段，故把 dividend_yield_history.json 按日 upsert，输出仍裁到约 2 年。
 """
 
 import json, os, time, sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # 清除代理，避免East Money API被代理限制
 for k in list(os.environ.keys()):
@@ -26,8 +32,17 @@ import akshare as ak
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_JSON = os.path.join(DIR, "dividend_data.json")
+YIELD_HIST = os.path.join(DIR, "dividend_yield_history.json")
 INDEX_CODE = "H30269"
 ETF_CODE = "563020"
+
+# 红绿灯 PE 分位样本。与 akshare stock_zh_index_hist_csindex 的历史默认区间一致
+# （2018-05-26 ~ 2024-06-04）。显式写死，避免库默认终点被改掉以后灯和分位一起漂。
+# 走势用同一接口拉到今天的滚动市盈率，但仍相对这一样本算分位。
+PE_SAMPLE_START = "20180526"
+PE_SAMPLE_END = "2024-06-04"
+# 两张走势对外只保留约 2 年，密度对齐主温度计的可读长度。
+HISTORY_WINDOW_DAYS = 730
 
 # ── 辅助 ──
 def safe_float(v):
@@ -92,6 +107,120 @@ def percentile_rank(value, series):
     below = sum(1 for x in s if x <= value)
     return round(below / len(s) * 100)
 
+def _iso_date(value):
+    if value is None:
+        return None
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d")
+    text = str(value)[:10]
+    if len(text) == 8 and text.isdigit():
+        return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
+    return text if len(text) == 10 and text[4] == "-" and text[7] == "-" else None
+
+def _window_start(end_date, days=HISTORY_WINDOW_DAYS):
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+    return (end - timedelta(days=days)).strftime("%Y-%m-%d")
+
+def pe_rows_from_df(df):
+    """[(YYYY-MM-DD, 滚动市盈率)]，按日期排序。"""
+    if df is None or len(df) == 0 or "滚动市盈率" not in getattr(df, "columns", []):
+        return []
+    rows = []
+    for raw_date, raw_pe in zip(df["日期"], df["滚动市盈率"]):
+        day = _iso_date(raw_date)
+        pe = safe_float(raw_pe)
+        if day and pe and pe > 0:
+            rows.append((day, pe))
+    rows.sort(key=lambda item: item[0])
+    return rows
+
+def ranking_sample(rows, sample_end=PE_SAMPLE_END):
+    """红绿灯用的长期 PE 样本，不含样本截止日之后的点。"""
+    return [pe for day, pe in rows if day <= sample_end]
+
+def downsample_weekly(points):
+    """每个 ISO 周保留最后一条，保持日期顺序。"""
+    last = {}
+    order = []
+    for point in points:
+        day = datetime.strptime(point["d"], "%Y-%m-%d")
+        year, week, _ = day.isocalendar()
+        key = (year, week)
+        if key not in last:
+            order.append(key)
+        last[key] = point
+    return [last[key] for key in order]
+
+def build_pe_temp_history(rows, sample, end_date=None):
+    """近约 2 年的滚动市盈率，按长期样本算分位，再降到周频。"""
+    if not rows or not sample:
+        return []
+    end = end_date or rows[-1][0]
+    start = _window_start(end)
+    daily = [
+        {"d": day, "t": percentile_rank(pe, sample)}
+        for day, pe in rows
+        if start <= day <= end
+    ]
+    return downsample_weekly(daily)
+
+def _yield_point(day, value):
+    day = _iso_date(day)
+    value = safe_float(value)
+    if not day or value is None or value <= 0:
+        return None
+    return {"d": day, "v": round(value, 2)}
+
+def normalize_yield_points(points):
+    out = []
+    for point in points or []:
+        if not isinstance(point, dict):
+            continue
+        item = _yield_point(point.get("d") or point.get("date"), point.get("v") if "v" in point else point.get("value"))
+        if item:
+            out.append(item)
+    return out
+
+def merge_yield_history(*groups):
+    """按日期 upsert：后面的组覆盖同一天。结果按日期排序。"""
+    by_date = {}
+    for group in groups:
+        for point in normalize_yield_points(group):
+            by_date[point["d"]] = point["v"]
+    return [{"d": day, "v": by_date[day]} for day in sorted(by_date)]
+
+def clip_yield_history(points, end_date=None):
+    if not points:
+        return []
+    end = end_date or points[-1]["d"]
+    start = _window_start(end)
+    return [point for point in points if start <= point["d"] <= end]
+
+def load_yield_archive():
+    try:
+        with open(YIELD_HIST, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return []
+    if isinstance(data, dict):
+        data = data.get("points") or data.get("dividend_history") or []
+    return normalize_yield_points(data)
+
+def save_yield_archive(points):
+    with open(YIELD_HIST, "w", encoding="utf-8") as f:
+        json.dump(points, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+def yield_points_from_val_df(val_df):
+    if val_df is None or "股息率1" not in getattr(val_df, "columns", []):
+        return []
+    points = []
+    for raw_date, raw_value in zip(val_df["日期"], val_df["股息率1"]):
+        item = _yield_point(raw_date, raw_value)
+        if item:
+            points.append(item)
+    return points
+
 def continuous_score(pct, base_pts):
     """线性插值打分 [(分位,得分)]"""
     if pct is None: return 50
@@ -106,13 +235,23 @@ def continuous_score(pct, base_pts):
 
 # ── A. 指数PE历史 ──
 def fetch_pe_history():
+    """拉 2018-05-26 至今的滚动市盈率。
+
+    返回 (分位样本, 全表)。样本只留到 PE_SAMPLE_END，供红绿灯和走势共用；
+    全表留给近 2 年温度走势。
+    """
     try:
-        df = ak.stock_zh_index_hist_csindex(symbol=INDEX_CODE)
-        if df is None or len(df) == 0: return None, None
-        pe_list = df['滚动市盈率'].dropna().tolist()
-        dates = df['日期'].tolist()
-        print(f"  PE历史: {len(pe_list)} 条, {dates[0]} ~ {dates[-1]}")
-        return pe_list, df
+        end = datetime.now().strftime("%Y%m%d")
+        df = ak.stock_zh_index_hist_csindex(
+            symbol=INDEX_CODE, start_date=PE_SAMPLE_START, end_date=end,
+        )
+        rows = pe_rows_from_df(df)
+        if not rows:
+            return None, None
+        sample = ranking_sample(rows)
+        print(f"  PE历史: {len(rows)} 条, {rows[0][0]} ~ {rows[-1][0]}")
+        print(f"  分位样本: {len(sample)} 条（截止 {PE_SAMPLE_END}）")
+        return sample, df
     except Exception as e:
         print(f"  PE历史抓取失败: {e}")
         return None, None
@@ -324,7 +463,7 @@ def main():
     # 1. PE历史
     print("\n📡 1. 获取PE历史...")
     pe_pack = call_retry(fetch_pe_history, "PE历史")
-    pe_history, _ = pe_pack if pe_pack else (None, None)
+    pe_history, pe_df = pe_pack if pe_pack else (None, None)
 
     # 2. 最新估值
     print("\n📡 2. 获取最新估值...")
@@ -404,23 +543,33 @@ def main():
     if trend_blocked:
         print(f"  🔒 趋势保护生效")
 
-    # 9. 走势数据
+    # 9. 走势数据（约 2 年）。分位样本与上面的红绿灯相同，不改 60 日趋势窗口。
     print("\n📈 9. 走势数据...")
-    temp_history, div_history = [], []
-    if val_df is not None:
-        for _, row in val_df[::-1].iterrows():
-            d = str(row['日期'])
-            pe = safe_float(row['市盈率1'])
-            dv = safe_float(row['股息率1'])
-            if pe and pe_hist_list:
-                temp_history.append({'d': d, 't': percentile_rank(pe, pe_hist_list)})
-            if dv:
-                div_history.append({'d': d, 'v': dv})
-
+    temp_history = build_pe_temp_history(pe_rows_from_df(pe_df), pe_hist_list)
     if not temp_history:
         temp_history = prev.get("temp_history") or []
-    if not div_history:
+    elif temp_history:
+        print(f"  温度走势: {len(temp_history)} 点, {temp_history[0]['d']} ~ {temp_history[-1]['d']}")
+
+    fresh_yields = yield_points_from_val_df(val_df)
+    merged_yields = merge_yield_history(
+        prev.get("dividend_history"),
+        load_yield_archive(),
+        fresh_yields,
+    )
+    if merged_yields:
+        save_yield_archive(merged_yields)
+        div_history = clip_yield_history(merged_yields)
+    else:
         div_history = prev.get("dividend_history") or []
+    if div_history:
+        span_days = (
+            datetime.strptime(div_history[-1]["d"], "%Y-%m-%d")
+            - datetime.strptime(div_history[0]["d"], "%Y-%m-%d")
+        ).days
+        print(f"  股息率走势: {len(div_history)} 点, {div_history[0]['d']} ~ {div_history[-1]['d']}（跨度 {span_days} 天）")
+        if span_days < HISTORY_WINDOW_DAYS - 30:
+            print("  官方股息率没有更长日频，已输出能回溯到的区间，之后按日累加")
     pb = pb if pb is not None else prev.get("pb")
     roe = roe if roe is not None else prev.get("roe")
     bond_yield = bond_yield if bond_yield is not None else prev.get("bond_yield")
@@ -471,6 +620,37 @@ def _selftest():
     merged = merge_fallback(prev, 1.69, {"price": 1.195, "premium_pct": 0, "update_time": "2026-10-09 11:02"}, None, None)
     assert merged["pe"] == 8.33 and merged["etf_price"] == 1.195 and merged["spread"] == 2.65
     assert merged["update_time"] == "old"
+
+    sample = [5.0, 6.0, 7.0, 8.0]
+    assert percentile_rank(8.0, sample) == 100
+    assert percentile_rank(5.0, sample) == 25
+    rows = [
+        ("2024-06-04", 6.0),  # 样本截止日，计入分位样本
+        ("2024-06-05", 9.0),  # 样本外，只参与走势
+        ("2024-10-23", 7.0),
+        ("2024-10-24", 7.2),
+        ("2026-10-22", 8.0),
+    ]
+    assert ranking_sample(rows) == [6.0]
+    hist = build_pe_temp_history(rows, ranking_sample(rows), end_date="2026-10-22")
+    # 2024-06 超出 730 天窗口；10-23 与 10-24 同一周只留后者
+    assert [point["d"] for point in hist] == ["2024-10-24", "2026-10-22"]
+    assert hist[-1]["t"] == percentile_rank(8.0, [6.0])
+    assert hist[0]["t"] == percentile_rank(7.2, [6.0])
+
+    yields = merge_yield_history(
+        [{"d": "2026-10-01", "v": 4.1}, {"d": "2026-10-02", "v": 4.2}],
+        [{"d": "2026-10-02", "v": 4.25}, {"date": "20261003", "value": 4.3}, {"d": "bad", "v": 1}],
+    )
+    assert yields == [
+        {"d": "2026-10-01", "v": 4.1},
+        {"d": "2026-10-02", "v": 4.25},
+        {"d": "2026-10-03", "v": 4.3},
+    ]
+    clipped = clip_yield_history(yields, end_date="2026-10-03")
+    assert clipped == yields
+    old = [{"d": "2020-01-02", "v": 5.0}] + yields
+    assert clip_yield_history(old, end_date="2026-10-03") == yields
     print("selftest ok")
 
 if __name__ == '__main__':
