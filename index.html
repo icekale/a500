@@ -957,7 +957,7 @@ function renderDividend(d){
   if(d.temp_history&&d.temp_history.length>0){
     new Chart(document.getElementById('divTempChart').getContext('2d'),{
       type:'line',data:{
-        labels:d.temp_history.map(function(r){return r.d.substring(5)}),
+        labels:d.temp_history.map(function(r){return r.d.slice(2)}),
         datasets:[{
           label:'温度',data:d.temp_history.map(function(r){return r.t}),
           borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.08)',
@@ -988,7 +988,7 @@ function renderDividend(d){
   if(d.dividend_history&&d.dividend_history.length>0){
     new Chart(document.getElementById('divYieldChart').getContext('2d'),{
       type:'line',data:{
-        labels:d.dividend_history.map(function(r){return r.d.substring(5)}),
+        labels:d.dividend_history.map(function(r){return r.d.slice(2)}),
         datasets:[{
           label:'股息率',data:d.dividend_history.map(function(r){return r.v}),
           borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',

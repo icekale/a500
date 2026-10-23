@@ -62,6 +62,15 @@ def main():
     transition = read_json("transition_data.json")
     temp_history = read_json("temp_history.json")
     pe_history = read_json("pe_history.json")
+    # dividend.temp_history / dividend_history 原样嵌入，长度由 fetch_dividend_data.py 决定。
+    div_temp = dividend.get("temp_history") or []
+    div_yield = dividend.get("dividend_history") or []
+    print(
+        f"dividend charts: temp_history {len(div_temp)}"
+        + (f" {div_temp[0].get('d')}~{div_temp[-1].get('d')}" if div_temp else "")
+        + f", dividend_history {len(div_yield)}"
+        + (f" {div_yield[0].get('d')}~{div_yield[-1].get('d')}" if div_yield else "")
+    )
 
     a500 = {
         **{key: page.get(key) for key in (
