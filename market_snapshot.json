@@ -1,16 +1,16 @@
 {
   "source": "a500",
   "temperature": 30,
-  "temperature_raw": 25,
+  "temperature_raw": 26,
   "temperature_status": "normal",
   "price": 4793.3,
   "change": -1.88,
-  "pe": 15.28,
-  "pe_percentile": 6.6,
-  "price_percentile": 51.4,
+  "pe": 15.37,
+  "pe_percentile": 8.3,
+  "price_percentile": 51.5,
   "market_status": "closed",
   "fresh": true,
   "delayed": false,
-  "updated_at": "2026-10-30T21:57:16+08:00",
-  "generated_at": "2026-10-30T13:57:20.854378+00:00"
+  "updated_at": "2026-10-30T22:25:53+08:00",
+  "generated_at": "2026-10-30T14:25:56.764286+00:00"
 }
