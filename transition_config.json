@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.5 - 4线22指标框架（东财直连优先 + 自愈回退）",
   "version": "0.5",
-  "last_updated": "2026-10-03",
+  "last_updated": "2026-10-31",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -90,9 +90,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 0.8,
-      "last_known_value": 0.8,
-      "last_known_date": "2026-08"
+      "manual_fallback": 0.9,
+      "last_known_value": 0.9,
+      "last_known_date": "2026-09"
     },
     "ppi": {
       "name": "PPI同比",
@@ -141,9 +141,9 @@
           "label": "扩张"
         }
       ],
-      "manual_fallback": 3.8,
-      "last_known_value": 3.8,
-      "last_known_date": "2026-08"
+      "manual_fallback": 5.0,
+      "last_known_value": 5.0,
+      "last_known_date": "2026-09"
     },
     "pmi": {
       "name": "制造业PMI",
@@ -192,9 +192,9 @@
           "label": "强劲"
         }
       ],
-      "manual_fallback": 50.1,
-      "last_known_value": 50.1,
-      "last_known_date": "2026-09"
+      "manual_fallback": 49.3,
+      "last_known_value": 49.3,
+      "last_known_date": "2026-10"
     },
     "electricity": {
       "name": "全社会用电量同比",
@@ -243,9 +243,9 @@
           "label": "过热"
         }
       ],
-      "last_known_value": 4.3,
-      "last_known_date": "2026-08",
-      "manual_fallback": 4.3
+      "last_known_value": 3.9,
+      "last_known_date": "2026-09",
+      "manual_fallback": 3.9
     },
     "retail_sales": {
       "name": "社零同比",
@@ -294,9 +294,9 @@
           "label": "旺盛"
         }
       ],
-      "manual_fallback": 0.4,
-      "last_known_value": 0.4,
-      "last_known_date": "2026-08"
+      "manual_fallback": 1.1,
+      "last_known_value": 1.1,
+      "last_known_date": "2026-09"
     },
     "unemployment": {
       "name": "城镇调查失业率",
@@ -345,9 +345,9 @@
           "label": "严峻"
         }
       ],
-      "manual_fallback": 5.3,
-      "last_known_value": 5.3,
-      "last_known_date": "2026-08"
+      "manual_fallback": 5.2,
+      "last_known_value": 5.2,
+      "last_known_date": "2026-09"
     },
     "disposable_income": {
       "name": "居民可支配收入累计同比",
@@ -441,9 +441,9 @@
           "label": "过度"
         }
       ],
-      "manual_fallback": 7.5,
-      "last_known_value": 7.5,
-      "last_known_date": "2026-08"
+      "manual_fallback": 7.2,
+      "last_known_value": 7.2,
+      "last_known_date": "2026-09"
     },
     "rmb_loan": {
       "name": "人民币贷款余额同比",
@@ -492,9 +492,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 4.92,
-      "last_known_value": 4.92,
-      "last_known_date": "2026-08"
+      "manual_fallback": 4.82,
+      "last_known_value": 4.82,
+      "last_known_date": "2026-09"
     },
     "bond_yield": {
       "name": "10年国债收益率",
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.679,
-      "last_known_value": 1.679,
-      "last_known_date": "2026-09-28"
+      "manual_fallback": 1.65,
+      "last_known_value": 1.65,
+      "last_known_date": "2026-10-30"
     },
     "lpr": {
       "name": "1年期LPR",
@@ -590,7 +590,7 @@
       ],
       "manual_fallback": 3.0,
       "last_known_value": 3.0,
-      "last_known_date": "2026-09-20"
+      "last_known_date": "2026-10-20"
     },
     "industrial_output": {
       "name": "工业增加值同比",
@@ -639,9 +639,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 5.2,
-      "last_known_value": 5.2,
-      "last_known_date": "2026-08"
+      "manual_fallback": 5.5,
+      "last_known_value": 5.5,
+      "last_known_date": "2026-09"
     },
     "export": {
       "name": "出口同比增速",
@@ -684,9 +684,9 @@
           "label": "强劲"
         }
       ],
-      "manual_fallback": 25.0,
-      "last_known_value": 25.0,
-      "last_known_date": "2026-08"
+      "manual_fallback": 36.3,
+      "last_known_value": 36.3,
+      "last_known_date": "2026-09"
     },
     "currency_index": {
       "name": "人民币CFETS汇率指数",
@@ -729,9 +729,9 @@
           "label": "过强"
         }
       ],
-      "manual_fallback": 102.93,
-      "last_known_value": 102.93,
-      "last_known_date": "2026-09-24"
+      "manual_fallback": 103.41,
+      "last_known_value": 103.41,
+      "last_known_date": "2026-10-23"
     },
     "ai_market_share": {
       "name": "中国AI模型海外调用份额",
@@ -774,9 +774,9 @@
           "label": "领先"
         }
       ],
-      "manual_fallback": 49.9,
-      "last_known_value": 49.9,
-      "last_known_date": "2026-10-03"
+      "manual_fallback": 50.2,
+      "last_known_value": 50.2,
+      "last_known_date": "2026-10-31"
     },
     "new_energy_penetration": {
       "name": "新能源汽车渗透率",
@@ -826,9 +826,9 @@
         }
       ],
       "_note": "通过 car_market_fuel_cpca / car_market_total_cpca 计算",
-      "last_known_value": 42.8,
-      "last_known_date": "2026-08",
-      "manual_fallback": 42.8
+      "last_known_value": 41.8,
+      "last_known_date": "2026-09",
+      "manual_fallback": 41.8
     },
     "pmi_nonmfg": {
       "name": "非制造业PMI",
@@ -877,9 +877,9 @@
           "label": "强劲"
         }
       ],
-      "manual_fallback": 50.2,
-      "last_known_value": 50.2,
-      "last_known_date": "2026-09"
+      "manual_fallback": 49.7,
+      "last_known_value": 49.7,
+      "last_known_date": "2026-10"
     },
     "fixed_asset_investment": {
       "name": "固定资产投资累计同比",
@@ -930,7 +930,7 @@
       ],
       "manual_fallback": -10.1,
       "last_known_value": -10.1,
-      "last_known_date": "2026-08"
+      "last_known_date": "2026-09"
     },
     "consumer_confidence": {
       "name": "消费者信心指数",
@@ -979,9 +979,9 @@
           "label": "高涨"
         }
       ],
-      "manual_fallback": 89.5,
-      "last_known_value": 89.5,
-      "last_known_date": "2026-08"
+      "manual_fallback": 89.0,
+      "last_known_value": 89.0,
+      "last_known_date": "2026-09"
     },
     "m1": {
       "name": "M1同比",
@@ -1030,9 +1030,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 4.1,
-      "last_known_value": 4.1,
-      "last_known_date": "2026-08"
+      "manual_fallback": 3.2,
+      "last_known_value": 3.2,
+      "last_known_date": "2026-09"
     },
     "social_financing": {
       "name": "社融增量同比",
@@ -1132,9 +1132,9 @@
           "label": "偏热"
         }
       ],
-      "manual_fallback": 28.2,
-      "last_known_value": 28.2,
-      "last_known_date": "2026-08"
+      "manual_fallback": 31.0,
+      "last_known_value": 31.0,
+      "last_known_date": "2026-09"
     }
   }
 }
