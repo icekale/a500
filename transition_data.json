@@ -201,14 +201,14 @@
       "name": "社融增量同比",
       "score": 25,
       "label": "收缩",
-      "value": -3.2,
-      "date": "2026-04",
+      "value": -10.1,
+      "date": "2026-09",
       "source": "中国人民银行（滚动12月）",
       "line": 3,
       "weight": 0.06,
       "auto": true,
-      "stale": true,
-      "stale_days": 199
+      "stale": false,
+      "stale_days": 46
     },
     "bond_yield": {
       "name": "10年国债收益率",

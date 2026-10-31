@@ -1075,9 +1075,9 @@
           "label": "过快"
         }
       ],
-      "manual_fallback": -3.2,
-      "last_known_value": -3.2,
-      "last_known_date": "2026-04"
+      "manual_fallback": -10.1,
+      "last_known_value": -10.1,
+      "last_known_date": "2026-09"
     },
     "import_yoy": {
       "name": "进口同比增速",
