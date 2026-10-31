@@ -16,8 +16,10 @@ v0.5 升级要点（解决"数据不更新"问题）：
 输出：transition_data.json（并回写 transition_config.json）
 """
 
-import os, sys, json, re, time
+import io, os, ssl, sys, json, re, time, zipfile
+import xml.etree.ElementTree as ET
 from datetime import datetime
+from urllib3.poolmanager import PoolManager
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # ── 清代理 ──
@@ -187,6 +189,176 @@ def cfg_fallback(key):
 
 def is_cur_year(date_str):
     return bool(date_str) and str(CUR_YEAR) in str(date_str)
+
+# ══════════════════════════════════════════════════════
+# 社融增量：商务部表停在 2026-04，月序列自己留底，央行当年表往后续
+# ══════════════════════════════════════════════════════
+
+SHRZ_PATH = os.path.join(DIR, "shrzgm_monthly.json")
+PBC_STATS = "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html"
+XLSX_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+
+def load_shrz_months():
+    try:
+        with open(SHRZ_PATH, encoding="utf-8") as f:
+            raw = json.load(f)
+        return {k: float(v) for k, v in raw.items() if re.fullmatch(r"20\d{2}-\d{2}", k) and safe_float(v) is not None}
+    except Exception:
+        return {}
+
+def save_shrz_months(series):
+    payload = {k: (int(v) if float(v).is_integer() else round(float(v), 4)) for k, v in sorted(series.items())}
+    with open(SHRZ_PATH, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+class LegacyTLSAdapter(requests.adapters.HTTPAdapter):
+    """商务部数据站只接受旧握手。只挂这一次请求，不改其它数据源。"""
+
+    def init_poolmanager(self, connections, maxsize, block=False):
+        ctx = ssl.create_default_context()
+        ctx.set_ciphers("DEFAULT@SECLEVEL=1")
+        ctx.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3
+        self.poolmanager = PoolManager(
+            num_pools=connections, maxsize=maxsize, block=block,
+            ssl_version=ssl.PROTOCOL_TLSv1_2, ssl_context=ctx,
+        )
+
+def mofcom_shrz_months():
+    """商务部镜像，只有 2015-01 到它停更的那个月。缺月才补，不覆盖已有值。"""
+    try:
+        session = requests.Session()
+        session.mount("https://", LegacyTLSAdapter())
+        r = session.post(
+            "https://data.mofcom.gov.cn/datamofcom/front/gnmy/shrzgmQuery",
+            headers=HEADERS, timeout=25,
+        )
+        rows = r.json() if r.status_code == 200 else []
+    except Exception as e:
+        print(f"  ⚠️ 商务部社融失败: {e}")
+        return {}
+    out = {}
+    for row in rows if isinstance(rows, list) else []:
+        d = str(row.get("date") or "")
+        v = safe_float(row.get("tiosfs"))
+        if re.fullmatch(r"20\d{4}", d) and v is not None:
+            out[f"{d[:4]}-{d[4:]}"] = v
+    return out
+
+def pbc_url(href):
+    if href.startswith("http"):
+        return href
+    return "https://www.pbc.gov.cn" + (href if href.startswith("/") else "/" + href)
+
+def xlsx_strings(book):
+    try:
+        root = ET.fromstring(book.read("xl/sharedStrings.xml"))
+    except Exception:
+        return []
+    return ["".join((t.text or "") for t in si.iter(f"{XLSX_NS}t")) for si in root.findall(f"{XLSX_NS}si")]
+
+def xlsx_text(cell, strings):
+    if cell.get("t") == "inlineStr":
+        return "".join((t.text or "") for t in cell.iter(f"{XLSX_NS}t"))
+    node = cell.find(f"{XLSX_NS}v")
+    if node is None or node.text is None:
+        return ""
+    if cell.get("t") == "s":
+        try:
+            return strings[int(node.text)]
+        except Exception:
+            return ""
+    return node.text
+
+def parse_pbc_flow_xlsx(blob):
+    """增量统计表：A 列月份，B 列当月增量（亿元）。空行跳过。"""
+    book = zipfile.ZipFile(io.BytesIO(blob))
+    strings = xlsx_strings(book)
+    sheet = next(name for name in book.namelist() if name.startswith("xl/worksheets/sheet"))
+    root = ET.fromstring(book.read(sheet))
+    out, prev = {}, None
+    for row in root.findall(f".//{XLSX_NS}sheetData/{XLSX_NS}row"):
+        cells = {}
+        for cell in row.findall(f"{XLSX_NS}c"):
+            ref = cell.get("r") or ""
+            cells["".join(ch for ch in ref if ch.isalpha())] = xlsx_text(cell, strings).strip()
+        matched = re.fullmatch(r"(\d{4})\.(\d{1,2})", cells.get("A", ""))
+        if not matched:
+            continue
+        year, month = int(matched.group(1)), int(matched.group(2))
+        # 未公布的 10 月在模板里写成 2026.1，夹在 09 和 11 之间。
+        if matched.group(2) == "1" and prev == (year, 9):
+            month = 10
+        prev = (year, month)
+        value = safe_float(cells.get("B"))
+        if value is not None and 1 <= month <= 12:
+            out[f"{year}-{month:02d}"] = value
+    return out
+
+def fetch_pbc(url):
+    # 页面是 UTF-8，但响应头写成 ISO-8859-1，requests 会把中文解成乱码。
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=25)
+        if response.status_code != 200:
+            return None
+        return response.content.decode("utf-8", "replace")
+    except Exception:
+        return None
+
+def pbc_shrz_months():
+    """统计数据页第一项「社会融资规模」是最新年份，打开其中的增量 xlsx。"""
+    index = fetch_pbc(PBC_STATS)
+    if not index:
+        print("  ⚠️ 央行统计数据页没有打开")
+        return {}
+    section = re.search(r"href=['\"]([^'\"]+)['\"][^>]*>\s*社会融资规模\s*<", index)
+    if not section:
+        print("  ⚠️ 央行页面上没有社会融资规模入口")
+        return {}
+    page = fetch_pbc(pbc_url(section.group(1)))
+    book = re.search(r"(?<!地区)社会融资规模增量统计表[\s\S]{0,1200}?href=['\"]([^'\"]+\.xlsx)", page or "")
+    if not book:
+        print("  ⚠️ 央行社融页没有增量 xlsx")
+        return {}
+    try:
+        response = requests.get(pbc_url(book.group(1)), headers=HEADERS, timeout=25)
+        if response.status_code != 200:
+            print(f"  ⚠️ 央行社融表 HTTP {response.status_code}")
+            return {}
+        months = parse_pbc_flow_xlsx(response.content)
+        print(f"  央行社融表 {len(months)} 个月，截至 {max(months) if months else '无'}")
+        return months
+    except Exception as e:
+        print(f"  ⚠️ 央行社融表失败: {e}")
+        return {}
+
+def shift_month(ym, k):
+    year, month = map(int, ym.split("-"))
+    index = year * 12 + (month - 1) - k
+    return f"{index // 12}-{index % 12 + 1:02d}"
+
+def shrz_rolling_yoy(series):
+    """最近 12 个月增量合计，对比再往前 12 个月。"""
+    for latest in sorted(series, reverse=True):
+        months = [shift_month(latest, k) for k in range(23, -1, -1)]
+        if not all(m in series for m in months):
+            continue
+        previous = sum(series[m] for m in months[:12])
+        if previous <= 0:
+            continue
+        recent = sum(series[m] for m in months[12:])
+        return round((recent / previous - 1) * 100, 1), latest
+    return None, None
+
+def social_financing_reading():
+    series = load_shrz_months()
+    for month, value in mofcom_shrz_months().items():
+        series.setdefault(month, value)
+    series.update(pbc_shrz_months())
+    value, date = shrz_rolling_yoy(series)
+    if series:
+        save_shrz_months(series)
+    return value, date
 
 # ══════════════════════════════════════════════════════
 # 指标抓取
@@ -380,28 +552,9 @@ def fetch_indicators():
         v, d = cfg_fallback('rmb_loan')
     results['rmb_loan'] = {'value': v, 'date': d, 'source': '中国人民银行', 'auto_fetched': auto}
 
-    # ── 社融增量同比（新，滚动12个月增量同比，akshare）──
-    v, d, auto = None, None, False
-    if HAS_AK:
-        try:
-            df = ak.macro_china_shrzgm()
-            # 嗅探列名：月份列 + 社融增量列
-            date_col = next((c for c in df.columns if '月' in c or '日期' in c), df.columns[0])
-            val_col = next((c for c in df.columns if '社会融资规模' in c and '其中' not in c), None)
-            if val_col:
-                df = df.copy()
-                df['_v'] = df[val_col].apply(safe_float)
-                df = df.dropna(subset=['_v'])
-                if len(df) >= 24:
-                    recent12 = df['_v'].iloc[-12:].sum()
-                    prev12 = df['_v'].iloc[-24:-12].sum()
-                    if prev12 > 0:
-                        v = round((recent12 / prev12 - 1) * 100, 1)
-                        dm = re.search(r'(20\d{2})\D{0,2}(\d{1,2})', str(df[date_col].iloc[-1]))
-                        d = f"{dm.group(1)}-{int(dm.group(2)):02d}" if dm else None
-                        auto = True
-        except Exception:
-            pass
+    # ── 社融增量同比：滚动 12 个月。商务部镜像停更后改读央行当年表，历史留在 shrzgm_monthly.json ──
+    v, d = social_financing_reading()
+    auto = v is not None
     if not auto:
         v, d = cfg_fallback('social_financing')
     results['social_financing'] = {'value': v, 'date': d, 'source': '中国人民银行（滚动12月）', 'auto_fetched': auto}
