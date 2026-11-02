@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.5 - 4线22指标框架（东财直连优先 + 自愈回退）",
   "version": "0.5",
-  "last_updated": "2026-11-01",
+  "last_updated": "2026-11-03",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.65,
-      "last_known_value": 1.65,
-      "last_known_date": "2026-10-30"
+      "manual_fallback": 1.6343,
+      "last_known_value": 1.6343,
+      "last_known_date": "2026-11-02"
     },
     "lpr": {
       "name": "1年期LPR",
@@ -729,9 +729,9 @@
           "label": "过强"
         }
       ],
-      "manual_fallback": 103.41,
-      "last_known_value": 103.41,
-      "last_known_date": "2026-10-23"
+      "manual_fallback": 103.77,
+      "last_known_value": 103.77,
+      "last_known_date": "2026-10-30"
     },
     "ai_market_share": {
       "name": "中国AI模型海外调用份额",
@@ -774,9 +774,9 @@
           "label": "领先"
         }
       ],
-      "manual_fallback": 50.2,
-      "last_known_value": 50.2,
-      "last_known_date": "2026-11-01"
+      "manual_fallback": 50.0,
+      "last_known_value": 50.0,
+      "last_known_date": "2026-11-03"
     },
     "new_energy_penetration": {
       "name": "新能源汽车渗透率",
