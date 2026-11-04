@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.5 - 4线22指标框架（东财直连优先 + 自愈回退）",
   "version": "0.5",
-  "last_updated": "2026-11-04",
+  "last_updated": "2026-11-05",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -774,9 +774,9 @@
           "label": "领先"
         }
       ],
-      "manual_fallback": 49.8,
-      "last_known_value": 49.8,
-      "last_known_date": "2026-11-04"
+      "manual_fallback": 49.6,
+      "last_known_value": 49.6,
+      "last_known_date": "2026-11-05"
     },
     "new_energy_penetration": {
       "name": "新能源汽车渗透率",
