@@ -214,14 +214,14 @@
       "name": "10年国债收益率",
       "score": 30,
       "label": "低",
-      "value": 1.621,
-      "date": "2026-11-03",
-      "source": "中国债券信息网",
+      "value": 1.6038,
+      "date": "2026-11-05",
+      "source": "东方财富（中国国债收益率）",
       "line": 3,
       "weight": 0.02,
-      "auto": false,
+      "auto": true,
       "stale": false,
-      "stale_days": 2
+      "stale_days": 0
     },
     "lpr": {
       "name": "1年期LPR",
@@ -292,7 +292,7 @@
       "name": "中国AI模型海外调用份额",
       "score": 100,
       "label": "领先",
-      "value": 49.6,
+      "value": 46.6,
       "date": "2026-11-05",
       "source": "OpenRouter",
       "line": 4,
