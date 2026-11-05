@@ -19,6 +19,8 @@ v0.5 升级要点（解决"数据不更新"问题）：
 import io, os, ssl, sys, json, re, time, zipfile
 import xml.etree.ElementTree as ET
 from datetime import datetime
+from html import unescape
+from urllib.parse import urljoin, urlsplit
 from urllib3.poolmanager import PoolManager
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -71,10 +73,12 @@ def safe_float(val, default=None):
     except Exception:
         return default
 
-def fetch_url(url, timeout=20, headers=None):
+def fetch_url(url, timeout=20, headers=None, encoding=None):
     try:
         r = requests.get(url, headers=headers or HEADERS, timeout=timeout)
-        return r.text if r.status_code == 200 else None
+        if r.status_code != 200:
+            return None
+        return r.content.decode(encoding, 'replace') if encoding else r.text
     except Exception:
         return None
 
@@ -157,7 +161,7 @@ def fetch_bond_reading():
 
 
 # ══════════════════════════════════════════════════════
-# Web 抓取（Trading Economics / CFETS / OpenRouter）
+# Web 抓取（Trading Economics / CFETS）
 # ══════════════════════════════════════════════════════
 
 MONTH_MAP = {'January':'01','February':'02','March':'03','April':'04','May':'05','June':'06',
@@ -205,30 +209,31 @@ def web_scrape_cfets():
         return val, (dates[0] if dates else None)
     return None, None
 
-def web_scrape_openrouter():
-    html = fetch_url("https://openrouter.ai/rankings")
-    if not html:
-        return None, None
-    cn_kws = ['deepseek','DeepSeek','xiaomi','Xiaomi','minimax','MiniMax','tencent','Tencent',
-              'alibaba','Alibaba','z-ai','Z-ai','stepfun','moonshot','Moonshot','kimi','Kimi']
-    us_kws = ['openai','OpenAI','anthropic','Anthropic','google','Google','meta','Meta',
-              'amazon','Amazon','nvidia','Nvidia']
-    cn_count = sum(len(re.findall(kw, html)) for kw in cn_kws)
-    us_count = sum(len(re.findall(kw, html)) for kw in us_kws)
-    total = cn_count + us_count
-    if total > 10:
-        share = round(cn_count / total * 100, 1)
-        if 10 < share < 90:
-            return share, datetime.now().strftime('%Y-%m-%d')
-    return None, None
 
 # ══════════════════════════════════════════════════════
 # 回退值工具
 # ══════════════════════════════════════════════════════
 
+def observation_date(value):
+    """缓存只接受真实、非未来的 ISO 月份/日期，不替坏日期猜时间。"""
+    if not isinstance(value, str):
+        return None
+    text = value
+    if not re.fullmatch(r'\d{4}-\d{2}(?:-\d{2})?', text):
+        return None
+    try:
+        date = datetime.strptime(text + '-01' if len(text) == 7 else text, '%Y-%m-%d').date()
+        return date if date <= datetime.now().date() else None
+    except ValueError:
+        return None
+
+
 def cfg_fallback(key):
     c = CONFIG['indicators'][key]
-    return c.get('manual_fallback'), c.get('last_known_date')
+    value, date = safe_float(c.get('manual_fallback')), c.get('last_known_date')
+    if c.get('included') is False or value is None or observation_date(date) is None:
+        return None, None
+    return value, date
 
 def is_cur_year(date_str):
     return bool(date_str) and str(CUR_YEAR) in str(date_str)
@@ -403,6 +408,103 @@ def social_financing_reading():
         save_shrz_months(series)
     return value, date
 
+NBS_RELEASES = 'https://www.stats.gov.cn/sj/zxfb/'
+
+
+def fai_report_period(text):
+    text = re.sub(r'\s+', '', unescape(re.sub(r'<[^>]+>', '', text)))
+    matched = re.search(r'(\d{4})年(?:(?:1[—－–-])?(\d{1,2})月份)?全国固定资产投资', text)
+    if not matched:
+        return None
+    date = f'{matched.group(1)}-{int(matched.group(2) or 12):02d}'
+    return date if observation_date(date) else None
+
+
+def parse_fai_release(html):
+    """取官方公布的可比口径累计同比，不由累计金额反推同比。"""
+    text = re.sub(r'\s+', '', unescape(re.sub(r'<[^>]+>', '', html or '')))
+    date = fai_report_period(text)
+    if not date or '可比口径' not in text:
+        return None, None
+    matched = re.search(r'全国固定资产投资[（(]不含农户[）)][^。；]{0,60}?同比(?:(下降|增长)(\d+(?:\.\d+)?)%|(持平))', text)
+    if not matched:
+        return None, None
+    value = 0.0 if matched.group(3) else safe_float(matched.group(2))
+    if value is None:
+        return None, None
+    return (-value if matched.group(1) == '下降' else value), date
+
+
+def fetch_fai_reading():
+    cached_value, cached_date = cfg_fallback('fixed_asset_investment')
+    source_url = CONFIG['indicators']['fixed_asset_investment'].get('last_known_source_url')
+    # ponytail: 只查最新发布前3页；栏目重构时保留核实缓存，再更新入口。
+    for page in ('', 'index_1.html', 'index_2.html'):
+        index_url = urljoin(NBS_RELEASES, page)
+        index = fetch_url(index_url, encoding='utf-8')
+        candidates = []
+        for anchor in re.findall(r'<a\b[^>]*>.*?</a>', index or '', re.S | re.I):
+            date = fai_report_period(anchor)
+            if not date:  # 标题也可能只出现在 title 属性内。
+                title = re.search(r'\btitle=[\'"]([^\'"]+)', anchor)
+                date = fai_report_period(title.group(1)) if title else None
+            href = re.search(r'\bhref=[\'"]([^\'"]+)', anchor)
+            if not date or not href:
+                continue
+            url = urljoin(index_url, unescape(href.group(1)))
+            if urlsplit(url).hostname == 'www.stats.gov.cn' and urlsplit(url).scheme == 'https':
+                candidates.append((date, url))
+        if candidates:
+            expected_date, url = max(candidates)
+            if cached_date and expected_date < cached_date:
+                break
+            value, date = parse_fai_release(fetch_url(url, encoding='utf-8'))
+            if value is not None and date == expected_date:
+                return {'value': value, 'date': date, 'source': '国家统计局（可比口径）',
+                        'source_url': url, 'auto_fetched': True}
+            break
+    return {'value': cached_value, 'date': cached_date, 'source': '国家统计局（可比口径，已知值回退）',
+            'source_url': source_url, 'auto_fetched': False}
+
+
+def latest_nev_retail_reading(fuel_rows, total_rows, year):
+    """同年、同月、同为狭义乘用车零售；保留行标签，跳过 NaN 而非压缩行号。"""
+    column = f'{year}年'
+    totals = {row.get('月份'): safe_float(row.get(column)) for row in total_rows}
+    latest = (None, None)
+    for row in fuel_rows:
+        month = str(row.get('月份') or '')
+        matched = re.fullmatch(r'(\d{1,2})月', month)
+        if not matched:
+            continue
+        date = f'{year}-{int(matched.group(1)):02d}'
+        fuel, total = safe_float(row.get(column)), totals.get(month)
+        if observation_date(date) is None or fuel is None or total is None:
+            continue
+        if total <= 0 or not 0 <= fuel <= total:
+            continue
+        if latest[1] is None or date > latest[1]:
+            latest = (round(fuel / total * 100, 1), date)
+    return latest
+
+
+def fetch_nev_reading():
+    value, date = None, None
+    if HAS_AK:
+        try:
+            fuel = ak.car_market_fuel_cpca(symbol='整体市场').to_dict('records')
+            total = ak.car_market_total_cpca(symbol='狭义乘用车', indicator='零售').to_dict('records')
+            value, date = latest_nev_retail_reading(fuel, total, CUR_YEAR)
+        except Exception as e:
+            print(f'  ⚠️ 乘联会零售数据失败: {e}')
+    auto = value is not None
+    cached_value, cached_date = cfg_fallback('new_energy_penetration')
+    if not auto or (cached_date and date < cached_date):
+        value, date, auto = cached_value, cached_date, False
+    return {'value': value, 'date': date, 'source': '乘联会（狭义乘用车零售）',
+            'source_url': 'http://data.cpcadata.com/api/chartlist?charttype=6', 'auto_fetched': auto}
+
+
 # ══════════════════════════════════════════════════════
 # 指标抓取
 # ══════════════════════════════════════════════════════
@@ -500,27 +602,8 @@ def fetch_indicators():
         v, d = cfg_fallback('electricity')
     results['electricity'] = {'value': v, 'date': d, 'source': '国家能源局', 'auto_fetched': auto}
 
-    # ── 固定资产投资累计同比（新）：东财累计值自行计算同比 ──
-    v, d, auto = None, None, False
-    rows = em_get('RPT_ECONOMY_ASSET_INVEST', pagesize=24)
-    if rows:
-        by_month = {r['REPORT_DATE'][:7]: r for r in rows}
-        latest = rows[0]
-        cur_key = latest['REPORT_DATE'][:7]
-        try:
-            y, mth = int(cur_key[:4]), int(cur_key[5:7])
-            ly = by_month.get(f"{y-1}-{mth:02d}")
-            cur_acc = safe_float(latest.get('BASE_ACCUMULATE'))
-            ly_acc = safe_float(ly.get('BASE_ACCUMULATE')) if ly else None
-            if cur_acc and ly_acc and ly_acc > 0:
-                v = round((cur_acc / ly_acc - 1) * 100, 1)
-                d = cur_key
-                auto = True
-        except Exception:
-            pass
-    if not auto:
-        v, d = cfg_fallback('fixed_asset_investment')
-    results['fixed_asset_investment'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
+    # 官方可比口径累计同比；不同年份累计金额的统计范围有修订。
+    results['fixed_asset_investment'] = fetch_fai_reading()
 
     # ══════ 主线二：就业与收入 ══════
 
@@ -660,39 +743,13 @@ def fetch_indicators():
         v, d = cfg_fallback('currency_index')
     results['currency_index'] = {'value': v, 'date': d, 'source': '中国外汇交易中心', 'auto_fetched': auto}
 
-    # ── AI调用份额 ──
-    v, d = web_scrape_openrouter()
-    auto = v is not None
-    if not auto:
-        v, d = cfg_fallback('ai_market_share')
-    results['ai_market_share'] = {'value': v, 'date': d, 'source': 'OpenRouter', 'auto_fetched': auto}
+    # 词频不是调用量：暂停采集和回退，保留卡片与原配置权重。
+    results['ai_market_share'] = {
+        'value': None, 'date': None, 'source': 'OpenRouter', 'auto_fetched': False,
+        'included': False, 'exclusion_reason': '缺少可核验的调用量数据，暂不计分',
+    }
 
-    # ── 新能源汽车渗透率（akshare 乘联会，此前工作正常）──
-    v, d, auto = None, None, False
-    if HAS_AK:
-        try:
-            df_fuel = ak.car_market_fuel_cpca()
-            df_total = ak.car_market_total_cpca()
-            col = f'{CUR_YEAR}年'
-            if col in df_fuel.columns and col in df_total.columns:
-                fuel_vals = df_fuel[col].dropna()
-                for i in range(len(fuel_vals) - 1, -1, -1):
-                    month = df_fuel.iloc[i]['月份']
-                    total_row = df_total[df_total['月份'] == month]
-                    if len(total_row) > 0:
-                        total_v = safe_float(total_row[col].iloc[0])
-                        fuel_v = safe_float(fuel_vals.iloc[i])
-                        if total_v and fuel_v and total_v > 0:
-                            v = round(fuel_v / total_v * 100, 1)
-                            mm = re.search(r'(\d+)', month)
-                            d = f"{CUR_YEAR}-{int(mm.group(1)):02d}" if mm else None
-                            auto = True
-                            break
-        except Exception:
-            pass
-    if not auto:
-        v, d = cfg_fallback('new_energy_penetration')
-    results['new_energy_penetration'] = {'value': v, 'date': d, 'source': '中国汽车工业协会', 'auto_fetched': auto}
+    results['new_energy_penetration'] = fetch_nev_reading()
 
     return results
 
@@ -721,58 +778,60 @@ def compute_stale(date_str: str, frequency: str) -> dict:
     except Exception:
         return {'stale': True, 'stale_days': 999}
 
+LINE_WEIGHT_KEYS = {1: 'line1_demand_price', 2: 'line2_employment_income',
+                    3: 'line3_money_credit', 4: 'line4_transition_open'}
+
+
 def compute_scores(results):
     scores = {}
-    for key, info in results.items():
+    for key in dict.fromkeys([*results, *CONFIG['indicators']]):
         if key not in CONFIG['indicators']:
             continue
         c = CONFIG['indicators'][key]
-        if info.get('value') is None:
-            # 无值且回退值也缺失：中性分占位并标记过期，不拖垮整体
-            scores[key] = {
-                'score': 50, 'label': '暂无数据', 'value': '—',
-                'date': info.get('date', '') or '',
-                'source': info.get('source', ''),
-                'auto_fetched': False,
-                'weight': c['weight'], 'line': c['line'],
-                'name': c['name'], 'stale': True, 'stale_days': 999,
-            }
-            continue
-        sc, lbl = score_value(info['value'], c['thresholds'])
-        stale_info = compute_stale(info.get('date', ''), c.get('frequency', '月'))
+        info = results.get(key, {})
+        value = safe_float(info.get('value'))
+        excluded = c.get('included') is False or info.get('included') is False
+        included = not excluded and value is not None and c['weight'] > 0
+        reason = (c.get('exclusion_reason') or info.get('exclusion_reason') or '暂不计分') if excluded else '缺少有效数据，暂不计分'
+        sc, lbl = score_value(value, c['thresholds']) if included else (None, '暂不计分')
         scores[key] = {
-            'score': sc, 'label': lbl, 'value': info['value'],
-            'date': info.get('date', ''),
-            'source': info.get('source', ''),
-            'auto_fetched': info.get('auto_fetched', True),
-            'weight': c['weight'], 'line': c['line'],
-            'name': c['name'],
-            'stale': stale_info['stale'],
-            'stale_days': stale_info['stale_days'],
+            'score': sc, 'label': lbl, 'value': value if included else None,
+            'date': info.get('date') if included else None,
+            'source': info.get('source', c.get('data_source', '')),
+            'source_url': info.get('source_url'),
+            'auto_fetched': bool(included and info.get('auto_fetched', True)),
+            'weight': 0, 'configured_weight': c['weight'], 'line': c['line'],
+            'included': included, 'exclusion_reason': None if included else reason,
+            'name': c['name'], 'unit': c.get('unit', ''),
+            'reference_range': c.get('reference_range'),
+            **compute_stale(info.get('date') if included else None, c.get('frequency', '月')),
         }
+    # 保留四条主线的名义比例，先线内归一；整线缺失才在其余主线之间归一。
+    line_available = {lid: sum(s['configured_weight'] for s in scores.values()
+                               if s['line'] == lid and s['included']) for lid in LINE_WEIGHT_KEYS}
+    active_weight = sum(CONFIG['weights'][key] for lid, key in LINE_WEIGHT_KEYS.items() if line_available[lid] > 0)
+    for s in scores.values():
+        if s['included'] and active_weight > 0:
+            s['weight'] = (s['configured_weight'] / line_available[s['line']]
+                           * CONFIG['weights'][LINE_WEIGHT_KEYS[s['line']]] / active_weight)
     return scores
 
+
 def compute_line_scores(scores):
-    lines = {1: [], 2: [], 3: [], 4: []}
-    for k, s in scores.items():
-        lines[s['line']].append(s)
-    line_temps = {}
-    for lid in [1, 2, 3, 4]:
-        items = lines[lid]
-        if items:
-            t = sum(s['score'] * s['weight'] for s in items) / sum(s['weight'] for s in items)
-            line_temps[f'line{lid}'] = round(t, 1)
-        else:
-            line_temps[f'line{lid}'] = 50.0
-    return line_temps
+    return {f'line{lid}': compute_composite({k: s for k, s in scores.items() if s['line'] == lid})
+            for lid in LINE_WEIGHT_KEYS}
+
 
 def compute_composite(scores):
-    total_weight = sum(s['weight'] for s in scores.values())
+    items = [s for s in scores.values() if s.get('included', True) and s['score'] is not None and s['weight'] > 0]
+    total_weight = sum(s['weight'] for s in items)
     if total_weight <= 0:
-        return 50
-    return round(sum(s['score'] * s['weight'] for s in scores.values()) / total_weight, 1)
+        return None
+    return round(sum(s['score'] * s['weight'] for s in items) / total_weight, 1)
 
 def get_band(temp):
+    if temp is None:
+        return '暂无数据', '—', '#999999', '暂无可计分指标，综合分暂缺'
     if temp < 40:
         return "低温区", "❄️", "#97C459", "整体偏冷：内需偏弱、就业承压，经济运行面临较多挑战"
     elif temp < 70:
@@ -790,11 +849,21 @@ def heal_config(results):
         if key not in CONFIG['indicators']:
             continue
         c = CONFIG['indicators'][key]
-        v, d = info.get('value'), info.get('date')
-        if info.get('auto_fetched') and v is not None and d and str(d) != str(c.get('last_known_date')):
-            c['last_known_value'] = round(v, 4) if isinstance(v, float) else v
+        v, d = safe_float(info.get('value')), info.get('date')
+        date, old_date = observation_date(d), observation_date(c.get('last_known_date'))
+        if not info.get('auto_fetched') or c.get('included') is False or info.get('included') is False:
+            continue
+        if v is None or date is None or (old_date and date < old_date):
+            continue
+        value = round(v, 4)
+        if (d != c.get('last_known_date') or value != c.get('last_known_value')
+                or value != c.get('manual_fallback')
+                or (info.get('source_url') and info['source_url'] != c.get('last_known_source_url'))):
+            c['last_known_value'] = value
             c['last_known_date'] = d
-            c['manual_fallback'] = c['last_known_value']
+            c['manual_fallback'] = value
+            if info.get('source_url'):
+                c['last_known_source_url'] = info['source_url']
             changed += 1
     if changed:
         CONFIG['last_updated'] = datetime.now().strftime('%Y-%m-%d')
@@ -803,6 +872,36 @@ def heal_config(results):
         print(f"💾 已回写 {changed} 个指标的最新值到 config（自愈回退值）")
     else:
         print("💾 config 无需回写")
+
+def build_output(results):
+    """只合成数据合同；不联网、不回写缓存，供采集与本地预览共用。"""
+    scores = compute_scores(results)
+    temp = compute_composite(scores)
+    band, emoji, color, desc = get_band(temp)
+    line_temps = compute_line_scores(scores)
+    total_weight = sum(s['configured_weight'] for s in scores.values())
+    available_weight = sum(s['configured_weight'] for s in scores.values() if s['included'])
+    lines = {}
+    for lid, wkey in LINE_WEIGHT_KEYS.items():
+        items = [s for s in scores.values() if s['line'] == lid]
+        configured = sum(s['configured_weight'] for s in items)
+        available = sum(s['configured_weight'] for s in items if s['included'])
+        lines[f'line{lid}'] = {
+            'name': CONFIG['lines'][f'line{lid}']['name'], 'score': line_temps[f'line{lid}'],
+            'weight': round(CONFIG['weights'][wkey] * 100, 0),
+            'available_coverage': round(available / configured, 6) if configured else 0,
+        }
+    return {
+        'date': datetime.now().strftime('%Y-%m-%d'), 'temperature': temp,
+        'band': band, 'emoji': emoji, 'color': color, 'description': desc,
+        'available_coverage': round(available_weight / total_weight, 6) if total_weight else 0,
+        'excluded_indicators': [k for k, s in scores.items() if not s['included']],
+        'scoring_method': '四主线保留30%/15%/25%/30%名义权重，线内按可计分指标配置权重重新归一；整线缺失时仅在有分主线间归一，全部缺失则不出分。覆盖率按原配置权重计算，包含有效回退值，不代表数据新鲜度。',
+        'lineScores': lines,
+        'indicators': {k: {**{field: value for field, value in s.items() if field != 'auto_fetched'},
+                           'auto': s['auto_fetched']} for k, s in scores.items()},
+    }
+
 
 def main():
     print(f"\n{'='*50}")
@@ -821,35 +920,9 @@ def main():
 
     heal_config(results)
 
-    scores = compute_scores(results)
-    temp = compute_composite(scores)
-    band, emoji, color, desc = get_band(temp)
-    line_temps = compute_line_scores(scores)
-
-    line_names = {1: "内需与物价", 2: "就业与收入", 3: "货币与信用", 4: "转型与开放"}
-    wkeys = {1: "line1_demand_price", 2: "line2_employment_income", 3: "line3_money_credit", 4: "line4_transition_open"}
-
-    output = {
-        "date": datetime.now().strftime('%Y-%m-%d'),
-        "temperature": temp,
-        "band": band,
-        "emoji": emoji,
-        "color": color,
-        "description": desc,
-        "lineScores": {
-            f"line{k}": {
-                "name": line_names[k],
-                "score": line_temps.get(f"line{k}", 50),
-                "weight": round(CONFIG['weights'][wkeys[k]] * 100, 0)
-            } for k in [1, 2, 3, 4]
-        },
-        "indicators": {k: {
-            "name": s['name'], "score": s['score'], "label": s['label'],
-            "value": s['value'], "date": s['date'], "source": s['source'],
-            "line": s['line'], "weight": s['weight'], "auto": s.get('auto_fetched', True),
-            "stale": s.get('stale', False), "stale_days": s.get('stale_days', 0),
-        } for k, s in scores.items()},
-    }
+    output = build_output(results)
+    scores = output['indicators']
+    temp, emoji, band = output['temperature'], output['emoji'], output['band']
 
     with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)

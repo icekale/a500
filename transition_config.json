@@ -734,11 +734,13 @@
       "last_known_date": "2026-10-30"
     },
     "ai_market_share": {
-      "name": "中国AI模型海外调用份额",
+      "name": "中国AI模型OpenRouter调用份额",
       "line": 4,
       "weight": 0.06,
-      "data_source": "OpenRouter排名",
-      "auto_fetch": true,
+      "data_source": "OpenRouter",
+      "auto_fetch": false,
+      "included": false,
+      "exclusion_reason": "缺少可核验的调用量数据，暂不计分",
       "frequency": "周",
       "unit": "%",
       "reference_range": "10%~40%",
@@ -774,15 +776,15 @@
           "label": "领先"
         }
       ],
-      "manual_fallback": 49.6,
-      "last_known_value": 49.6,
-      "last_known_date": "2026-11-05"
+      "manual_fallback": null,
+      "last_known_value": null,
+      "last_known_date": null
     },
     "new_energy_penetration": {
-      "name": "新能源汽车渗透率",
+      "name": "乘联会狭义乘用车新能源零售渗透率",
       "line": 4,
       "weight": 0.04,
-      "data_source": "中国汽车工业协会",
+      "data_source": "乘联会（狭义乘用车零售）",
       "auto_fetch": true,
       "frequency": "月",
       "unit": "%",
@@ -825,10 +827,12 @@
           "label": "主导"
         }
       ],
-      "_note": "通过 car_market_fuel_cpca / car_market_total_cpca 计算",
-      "last_known_value": 41.8,
+      "_note": "同月狭义乘用车新能源零售/总零售；2026-09：108.3843/161.7989×100=67.0%。原41.8%混用零售和产量，已废弃。",
+      "last_known_value": 67.0,
       "last_known_date": "2026-09",
-      "manual_fallback": 41.8
+      "manual_fallback": 67.0,
+      "last_known_source_url": "http://data.cpcadata.com/api/chartlist?charttype=6",
+      "denominator_source_url": "http://data.cpcadata.com/api/chartlist?charttype=1"
     },
     "pmi_nonmfg": {
       "name": "非制造业PMI",
@@ -928,9 +932,11 @@
           "label": "强劲"
         }
       ],
-      "manual_fallback": -10.1,
-      "last_known_value": -10.1,
-      "last_known_date": "2026-09"
+      "manual_fallback": -7.2,
+      "last_known_value": -7.2,
+      "last_known_date": "2026-09",
+      "last_known_source_url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965616.html",
+      "_note": "直接采用国家统计局发布的固定资产投资（不含农户）可比口径累计同比，不用历年累计金额相除。"
     },
     "consumer_confidence": {
       "name": "消费者信心指数",
