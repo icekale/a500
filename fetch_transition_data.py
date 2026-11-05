@@ -82,10 +82,10 @@ def fetch_url(url, timeout=20, headers=None):
 # 东方财富数据中心直连（首选源，带重试）
 # ══════════════════════════════════════════════════════
 
-def em_get(report, pagesize=5, retries=3):
+def em_get(report, pagesize=5, retries=3, sort_column='REPORT_DATE'):
     """从东财数据中心取最近 pagesize 条记录，失败重试。返回 list[dict] 或 None"""
     url = (f"https://datacenter-web.eastmoney.com/api/data/v1/get"
-           f"?sortColumns=REPORT_DATE&sortTypes=-1&pageSize={pagesize}&pageNumber=1"
+           f"?sortColumns={sort_column}&sortTypes=-1&pageSize={pagesize}&pageNumber=1"
            f"&reportName={report}&columns=ALL")
     for i in range(retries):
         try:
@@ -112,6 +112,49 @@ def em_field(report, field, pagesize=5):
             date = f"{m.group(1)}-{int(m.group(2)):02d}" if m else row.get('REPORT_DATE', '')[:7]
             return v, date
     return None, None
+
+def latest_bond_reading(rows, value_key, date_key):
+    """中美节假日不同，跳过中国收益率为空的行；日期必须属于同一条有效报价。"""
+    latest = (None, None)
+    if not isinstance(rows, list):
+        return latest
+    today = datetime.now().date()
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        value = safe_float(row.get(value_key))
+        date = str(row.get(date_key) or '')[:10]
+        try:
+            quoted = datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            continue
+        if value is None or not 0 < value < 100 or quoted > today:
+            continue
+        date = quoted.isoformat()
+        if latest[1] is None or date > latest[1]:
+            latest = (value, date)
+    return latest
+
+
+def fetch_bond_reading():
+    """只取近期10Y报价：东财直连 → akshare → 保留原日期的已知值。"""
+    cached_value, cached_date = cfg_fallback('bond_yield')
+    rows = em_get('RPTA_WEB_TREASURYYIELD', pagesize=10, sort_column='SOLAR_DATE')
+    # EMM00166466 为中国10年期；EMG00001310 为美国10年期，不能混用。
+    value, date = latest_bond_reading(rows, 'EMM00166466', 'SOLAR_DATE')
+    if value is not None and (not cached_date or date >= cached_date):
+        return {'value': value, 'date': date, 'source': '东方财富（中国国债收益率）', 'auto_fetched': True}
+    if HAS_AK:
+        try:
+            rows = ak.bond_zh_us_rate().to_dict('records')
+            value, date = latest_bond_reading(rows, '中国国债收益率10年', '日期')
+            if value is not None and (not cached_date or date >= cached_date):
+                return {'value': value, 'date': date, 'source': '东方财富（经 AKShare）', 'auto_fetched': True}
+        except Exception as e:
+            print(f"  ⚠️ 国债收益率备用源失败: {e}")
+    print(f"  ⚠️ 国债收益率自动获取未返回新报价，保留 {cached_date} 的已知值")
+    return {'value': cached_value, 'date': cached_date, 'source': '本地已知值（回退）', 'auto_fetched': False}
+
 
 # ══════════════════════════════════════════════════════
 # Web 抓取（Trading Economics / CFETS / OpenRouter）
@@ -559,19 +602,8 @@ def fetch_indicators():
         v, d = cfg_fallback('social_financing')
     results['social_financing'] = {'value': v, 'date': d, 'source': '中国人民银行（滚动12月）', 'auto_fetched': auto}
 
-    # ── 10Y国债收益率 ──
-    v, d, auto = None, None, False
-    if HAS_AK:
-        try:
-            df_bond = ak.bond_zh_us_rate()
-            v = safe_float(df_bond.iloc[-1]['中国国债收益率10年'])
-            d = str(df_bond.iloc[-1]['日期'])
-            auto = v is not None
-        except Exception:
-            pass
-    if not auto:
-        v, d = cfg_fallback('bond_yield')
-    results['bond_yield'] = {'value': v, 'date': d, 'source': '中国债券信息网', 'auto_fetched': auto}
+    # ── 10Y国债收益率：近期数据直连，保留自动/回退的真实状态 ──
+    results['bond_yield'] = fetch_bond_reading()
 
     # ── 1年期LPR ──
     v, d, auto = None, None, False
