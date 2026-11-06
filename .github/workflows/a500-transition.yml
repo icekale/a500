@@ -32,6 +32,7 @@ jobs:
         run: pip install akshare numpy pandas requests
 
       - name: 抓取经济健康度数据
+        id: fetch
         run: python fetch_transition_data.py
         env:
           NO_PROXY: '*'
@@ -51,3 +52,12 @@ jobs:
           git commit -m "📊 经济健康度数据更新 $(date +'%Y-%m-%d')"
           git pull --rebase --autostash origin main || true
           git push
+
+      # 数据照常提交；有指标走了回退值就把这次运行标红，GitHub 会发失败邮件。
+      - name: 回退指标告警
+        if: steps.fetch.outputs.fallbacks != ''
+        env:
+          FALLBACKS: ${{ steps.fetch.outputs.fallbacks }}
+        run: |
+          echo "::error title=宏观指标回退::没有自动获取: $FALLBACKS"
+          exit 1

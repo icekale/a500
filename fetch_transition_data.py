@@ -73,13 +73,19 @@ def safe_float(val, default=None):
     except Exception:
         return default
 
+def source_failed(label, error):
+    """数据源失败要留痕：以前这里一律 pass，换源失效好几周都看不出来。"""
+    print(f"  ⚠️ {label} 失败: {type(error).__name__}: {str(error)[:200]}")
+
 def fetch_url(url, timeout=20, headers=None, encoding=None):
     try:
         r = requests.get(url, headers=headers or HEADERS, timeout=timeout)
         if r.status_code != 200:
+            print(f"  ⚠️ {urlsplit(url).netloc} HTTP {r.status_code}")
             return None
         return r.content.decode(encoding, 'replace') if encoding else r.text
-    except Exception:
+    except Exception as e:
+        source_failed(urlsplit(url).netloc, e)
         return None
 
 # ══════════════════════════════════════════════════════
@@ -348,9 +354,11 @@ def fetch_pbc(url):
     try:
         response = requests.get(url, headers=HEADERS, timeout=25)
         if response.status_code != 200:
+            print(f"  ⚠️ 央行页面 HTTP {response.status_code}: {url}")
             return None
         return response.content.decode("utf-8", "replace")
-    except Exception:
+    except Exception as e:
+        source_failed(f"央行页面 {url}", e)
         return None
 
 def pbc_shrz_months():
@@ -630,8 +638,8 @@ def fetch_indicators():
             v = safe_float(df['今值'].iloc[-1])
             d = str(df['日期'].iloc[-1])
             auto = v is not None and is_cur_year(d)
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_cpi_yearly", e)
     if not auto:
         v, d = cfg_fallback('cpi')
     results['cpi'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -645,8 +653,8 @@ def fetch_indicators():
             v = safe_float(df['今值'].iloc[-1])
             d = str(df['日期'].iloc[-1])
             auto = v is not None and is_cur_year(d)
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_ppi_yearly", e)
     if not auto:
         v, d = cfg_fallback('ppi')
     results['ppi'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -660,8 +668,8 @@ def fetch_indicators():
             v = safe_float(df['制造业-指数'].iloc[-1])
             d = str(df['月份'].iloc[-1])
             auto = v is not None and is_cur_year(d)
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_pmi_yearly", e)
     if not auto:
         v, d = cfg_fallback('pmi')
     results['pmi'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -684,8 +692,8 @@ def fetch_indicators():
                 v = safe_float(df_cy['同比增长'].iloc[0])
                 d = str(df_cy['月份'].iloc[0]).replace('年', '-').replace('月', '-01')[:10][:-3]
                 auto = v is not None
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_consumer_goods_retail", e)
     if not auto:
         v, d = cfg_fallback('retail_sales')
     results['retail_sales'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -701,8 +709,8 @@ def fetch_indicators():
             if len(parts) == 2:
                 d = f"{parts[0]}-{int(parts[1]):02d}"
             auto = v is not None
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_society_electricity", e)
     if not auto:
         v, d = cfg_fallback('electricity')
     results['electricity'] = {'value': v, 'date': d, 'source': '国家能源局', 'auto_fetched': auto}
@@ -753,8 +761,8 @@ def fetch_indicators():
             v = safe_float(df['货币和准货币(M2)-同比增长'].iloc[-1])
             d = str(df['月份'].iloc[-1])
             auto = v is not None and is_cur_year(d)
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_m2_yearly", e)
     if not auto:
         v, d = cfg_fallback('m2')
     results['m2'] = {'value': v, 'date': d, 'source': '中国人民银行', 'auto_fetched': auto}
@@ -778,8 +786,8 @@ def fetch_indicators():
                 v = safe_float(g.group(1))
             d = str(latest['月份']).replace('年', '-').replace('月', '')[:7]
             auto = v is not None
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_rmb_loan", e)
     if not auto:
         v, d = cfg_fallback('rmb_loan')
     results['rmb_loan'] = {'value': v, 'date': d, 'source': '中国人民银行', 'auto_fetched': auto}
@@ -803,8 +811,8 @@ def fetch_indicators():
             v = safe_float(latest['LPR1Y'])
             d = str(latest['TRADE_DATE'])
             auto = v is not None
-        except Exception:
-            pass
+        except Exception as e:
+            source_failed("akshare macro_china_lpr", e)
     if not auto:
         v, d = cfg_fallback('lpr')
     results['lpr'] = {'value': v, 'date': d, 'source': '全国银行间同业拆借中心', 'auto_fetched': auto}
@@ -1009,6 +1017,34 @@ def build_output(results):
     }
 
 
+def fallback_indicators(results):
+    """该自动抓取、也参与计分，这次却用了回退值的指标。"""
+    out = []
+    for key, c in CONFIG['indicators'].items():
+        info = results.get(key, {})
+        if c.get('auto_fetch') and c.get('included') is not False and info.get('included') is not False \
+                and not info.get('auto_fetched'):
+            out.append((key, c.get('name', key), info.get('value'), info.get('date')))
+    return out
+
+def report_fallbacks(fallbacks, env=os.environ):
+    """写进 Actions 运行摘要和 step 输出；workflow 最后一步据此判失败，让 GitHub 发邮件。"""
+    names = '、'.join(name for _, name, _, _ in fallbacks)
+    if fallbacks:
+        print(f"::warning title=宏观指标回退::{len(fallbacks)} 个指标没有自动获取: {names}")
+    summary = env.get('GITHUB_STEP_SUMMARY')
+    if summary:
+        with open(summary, 'a', encoding='utf-8') as f:
+            if fallbacks:
+                f.write(f"### ⚠️ {len(fallbacks)} 个指标沿用回退值\n\n| key | 指标 | 回退值 | 日期 |\n|---|---|---|---|\n")
+                f.writelines(f"| `{k}` | {name} | {v} | {d} |\n" for k, name, v, d in fallbacks)
+            else:
+                f.write("### ✅ 所有自动指标均已自动获取\n")
+    output = env.get('GITHUB_OUTPUT')
+    if output:
+        with open(output, 'a', encoding='utf-8') as f:
+            f.write(f"fallbacks={names}\n")
+
 def main():
     print(f"\n{'='*50}")
     print(f"📊 中国经济健康度温度计 v{CONFIG.get('version', '?')}")
@@ -1043,6 +1079,7 @@ def main():
         stale_names = [s['name'] for s in scores.values() if s.get('stale')]
         print(f"│  ⚠️  过期指标({stale_count}): {'·'.join(stale_names)}")
     print(f"└────────────────────────────────────────────────")
+    report_fallbacks(fallback_indicators(results))
 
 if __name__ == '__main__':
     main()

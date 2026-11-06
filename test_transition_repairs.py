@@ -239,6 +239,26 @@ class TransitionRepairsTest(unittest.TestCase):
             loan = fetcher.fetch_indicators()['rmb_loan']
         self.assertEqual((loan['value'], loan['date'], loan['auto_fetched']), (4.82, '2026-09', True))
 
+    def test_fallback_report_lists_only_scored_auto_indicators(self):
+        results = self.readings()
+        for key in results:
+            results[key]['auto_fetched'] = True
+        results['rmb_loan'].update(auto_fetched=False, value=4.82, date='2026-09')
+        results['ai_market_share']['auto_fetched'] = False  # 配置里排除，不算回退
+        self.config['indicators']['lpr']['auto_fetch'] = False
+        results['lpr']['auto_fetched'] = False  # 本就手填，不报
+        fallbacks = fetcher.fallback_indicators(results)
+        self.assertEqual(fallbacks, [('rmb_loan', '人民币贷款余额同比', 4.82, '2026-09')])
+        with tempfile.TemporaryDirectory() as directory:
+            summary, output = Path(directory) / 'summary.md', Path(directory) / 'output'
+            env = {'GITHUB_STEP_SUMMARY': str(summary), 'GITHUB_OUTPUT': str(output)}
+            fetcher.report_fallbacks(fallbacks, env)
+            self.assertIn('| `rmb_loan` | 人民币贷款余额同比 | 4.82 | 2026-09 |', summary.read_text())
+            self.assertEqual(output.read_text(), 'fallbacks=人民币贷款余额同比\n')
+            fetcher.report_fallbacks([], env)
+            self.assertIn('所有自动指标均已自动获取', summary.read_text())
+            self.assertTrue(output.read_text().endswith('fallbacks=\n'))
+
     def test_heal_updates_same_date_revisions_new_dates_and_provenance(self):
         c = self.config['indicators']['cpi']
         c.update(last_known_date='2020-01', last_known_value=1, manual_fallback=1)
