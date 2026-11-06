@@ -87,6 +87,7 @@ class BondReadingTest(unittest.TestCase):
              patch.object(fetcher, 'em_get', return_value=None), \
              patch.object(fetcher, 'fetch_url', return_value=None), \
              patch.object(fetcher, 'social_financing_reading', return_value=(None, None)), \
+             patch.object(fetcher, 'rmb_loan_reading', return_value=(None, None)), \
              patch.object(fetcher, 'fetch_bond_reading', return_value=result):
             self.assertEqual(fetcher.fetch_indicators()['bond_yield'], result)
 

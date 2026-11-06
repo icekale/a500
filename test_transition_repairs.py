@@ -3,9 +3,11 @@
 Standard-library unittest/mocks; no network, AKShare or pandas required.
 """
 import copy
+import io
 import json
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -44,7 +46,8 @@ class TransitionRepairsTest(unittest.TestCase):
         with patch.object(fetcher, 'HAS_AK', False), \
              patch.object(fetcher, 'em_get', return_value=None), \
              patch.object(fetcher, 'fetch_url', return_value=None) as get, \
-             patch.object(fetcher, 'social_financing_reading', return_value=(None, None)):
+             patch.object(fetcher, 'social_financing_reading', return_value=(None, None)), \
+             patch.object(fetcher, 'rmb_loan_reading', return_value=(None, None)):
             collected = fetcher.fetch_indicators()
         self.assertIsNone(collected['ai_market_share']['value'])
         self.assertFalse(collected['ai_market_share']['included'])
@@ -181,6 +184,60 @@ class TransitionRepairsTest(unittest.TestCase):
             result = fetcher.fetch_fai_reading()
             self.assertEqual(get.call_count, 1)
             self.assertFalse(result['auto_fetched'])
+
+    def test_rmb_loan_balance_yoy_from_pbc_credit_tables(self):
+        def xlsx(header, loans):
+            def row(r, values):
+                cells = ''.join(
+                    f'<c r="{chr(65 + i)}{r}" t="inlineStr"><is><t>{v}</t></is></c>' if isinstance(v, str) and i == 0
+                    else f'<c r="{chr(65 + i)}{r}"><v>{v}</v></c>' for i, v in enumerate(values) if v is not None)
+                return f'<row r="{r}">{cells}</row>'
+            ns = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'
+            sheet = (f'<worksheet xmlns="{ns}"><sheetData>{row(1, ["金融机构人民币信贷收支表"])}'
+                     f'{row(6, ["项目 Item", *header])}{row(9, ["一、各项存款 Total Deposits", *[9e9] * len(header)])}'
+                     f'{row(27, ["一、各项贷款 Total Loans", *loans])}</sheetData></worksheet>')
+            blob = io.BytesIO()
+            with zipfile.ZipFile(blob, 'w') as book:
+                book.writestr('xl/worksheets/sheet1.xml', sheet)
+            return blob.getvalue()
+
+        this_year = xlsx(['2020.08', '2020.09', '2020.1', '2020.11'], [104, 105, 106, None])
+        self.assertEqual(fetcher.parse_pbc_balance_xlsx(this_year),
+                         {'2020-08': 104.0, '2020-09': 105.0, '2020-10': 106.0})
+        last_year = xlsx(['2019.09', '2019.1', '2019.11', '2019.12'], [100, 100, 101, 102])
+        index = """<a href="/s/2020n/index.html">2020年统计数据</a><a href="/s/2020n/jr/index.html">金融机构信贷收支统计</a>
+                   <a href="/s/555/index.html">2019年统计数据</a><a href="/s/555/556/index.html">金融机构信贷收支统计</a>
+                   <a href="/s/554/index.html">2018年统计数据</a><a href="/s/554/557/index.html">金融机构信贷收支统计</a>"""
+        self.assertEqual([y for y, _ in fetcher.pbc_loan_tables(index)], [2020, 2019, 2018])
+        page = lambda name: f"""<div>存款类金融机构人民币信贷收支表</div><a href="/a/wrong.xlsx">xls</a>
+                                <div>金融机构人民币信贷收支表</div><a href="/a/{name}.xlsx">xls</a>"""
+        pages = {'https://www.pbc.gov.cn' + p: page(n) for p, n in
+                 [('/s/2020n/jr/index.html', 'this'), ('/s/555/556/index.html', 'last'), ('/s/554/557/index.html', 'older')]}
+        pages[fetcher.PBC_STATS] = index
+        books = {'this': this_year, 'last': last_year}
+
+        def get(url, **_):
+            name = url.rsplit('/', 1)[1].removesuffix('.xlsx')
+            return SimpleNamespace(status_code=200 if name in books else 404, content=books.get(name, b''))
+
+        with patch.object(fetcher, 'fetch_pbc', side_effect=pages.get), \
+             patch.object(fetcher.requests, 'get', side_effect=get):
+            self.assertEqual(fetcher.rmb_loan_reading(), (6.0, '2020-10'))
+            books['this'] = xlsx(['2020.01'], [None])  # 1 月数据未出：用上一年 12 月
+            books['older'] = xlsx(['2018.12'], [100])
+            self.assertEqual(fetcher.rmb_loan_reading(), (2.0, '2019-12'))
+            del books['this']  # 最新年份打不开就不拿旧年份冒充
+            self.assertEqual(fetcher.rmb_loan_reading(), (None, None))
+
+        results = self.readings()
+        with patch.object(fetcher, 'HAS_AK', False), \
+             patch.object(fetcher, 'em_get', return_value=None), \
+             patch.object(fetcher, 'fetch_url', return_value=None), \
+             patch.object(fetcher, 'social_financing_reading', return_value=(None, None)), \
+             patch.object(fetcher, 'fetch_bond_reading', return_value=results['bond_yield']), \
+             patch.object(fetcher, 'rmb_loan_reading', return_value=(4.82, '2026-09')):
+            loan = fetcher.fetch_indicators()['rmb_loan']
+        self.assertEqual((loan['value'], loan['date'], loan['auto_fetched']), (4.82, '2026-09', True))
 
     def test_heal_updates_same_date_revisions_new_dates_and_provenance(self):
         c = self.config['indicators']['cpi']

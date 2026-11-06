@@ -408,6 +408,111 @@ def social_financing_reading():
         save_shrz_months(series)
     return value, date
 
+# ══════════════════════════════════════════════════════
+# 人民币贷款余额：央行「金融机构人民币信贷收支表」各项贷款，今年表对去年表算同比。
+# 同花顺页面在 Actions 境外 IP 上打不开，央行站点可以。
+# ══════════════════════════════════════════════════════
+
+def xlsx_column_index(letters):
+    index = 0
+    for ch in letters:
+        index = index * 26 + ord(ch) - 64
+    return index
+
+def parse_pbc_balance_xlsx(blob, label="各项贷款"):
+    """信贷收支表：A 列「项目」那行是 YYYY.MM 表头，取 A 列含 label 那行的月末余额（亿元）。"""
+    book = zipfile.ZipFile(io.BytesIO(blob))
+    strings = xlsx_strings(book)
+    sheet = next(name for name in book.namelist() if name.startswith("xl/worksheets/sheet"))
+    root = ET.fromstring(book.read(sheet))
+    header = None
+    for row in root.findall(f".//{XLSX_NS}sheetData/{XLSX_NS}row"):
+        cells = {}
+        for cell in row.findall(f"{XLSX_NS}c"):
+            ref = cell.get("r") or ""
+            cells["".join(ch for ch in ref if ch.isalpha())] = xlsx_text(cell, strings).strip()
+        first = cells.get("A", "")
+        if header is None:
+            if not first.startswith("项目"):
+                continue
+            header, prev = {}, None
+            for column in sorted((c for c in cells if c != "A"), key=xlsx_column_index):
+                matched = re.fullmatch(r"(\d{4})\.(\d{1,2})", cells[column])
+                if not matched:
+                    continue
+                year, month = int(matched.group(1)), int(matched.group(2))
+                # 表头是数值，10 月存成 2026.1，跟在 09 后面。
+                if matched.group(2) == "1" and prev == (year, 9):
+                    month = 10
+                prev = (year, month)
+                if 1 <= month <= 12:
+                    header[column] = f"{year}-{month:02d}"
+            continue
+        if label in first:
+            out = {}
+            for column, month in header.items():
+                value = safe_float(cells.get(column))
+                if value is not None and value > 0:
+                    out[month] = value
+            return out
+    return {}
+
+def pbc_loan_tables(index):
+    """统计数据页按年份列出，返回 [(年份, 金融机构信贷收支统计页)]，新的在前。"""
+    years = {}
+    for href, year in re.findall(r"href=['\"]([^'\"]+/index\.html?)['\"][^>]*>\s*(20\d{2})年统计数据\s*<", index):
+        years.setdefault(int(year), pbc_url(href))
+    out = []
+    for year in sorted(years, reverse=True):
+        base = years[year].rsplit("/", 1)[0] + "/"
+        for href, title in re.findall(r"href=['\"]([^'\"]+)['\"][^>]*>\s*([^<]+?)\s*<", index):
+            if title == "金融机构信贷收支统计" and pbc_url(href).startswith(base):
+                out.append((year, pbc_url(href)))
+                break
+    return out
+
+def pbc_loan_year(url):
+    """一年的各项贷款余额；页面或表格打不开返回 None，表里还没有数据返回 {}。"""
+    page = fetch_pbc(url)
+    book = re.search(r"(?<![一-鿿])金融机构人民币信贷收支表[\s\S]{0,1200}?href=['\"]([^'\"]+\.xlsx)", page or "")
+    if not book:
+        return None
+    try:
+        response = requests.get(pbc_url(book.group(1)), headers=HEADERS, timeout=25)
+        if response.status_code != 200:
+            return None
+        return parse_pbc_balance_xlsx(response.content)
+    except Exception as e:
+        print(f"  ⚠️ 央行信贷收支表失败: {e}")
+        return None
+
+def balance_yoy(series):
+    for latest in sorted(series, reverse=True):
+        previous = series.get(shift_month(latest, 12))
+        if previous:
+            return round((series[latest] / previous - 1) * 100, 2), latest
+    return None, None
+
+def rmb_loan_reading(max_years=3):
+    """最新年份的表必须打开；它还空着（1 月数据未出）就再往前一年。"""
+    index = fetch_pbc(PBC_STATS)
+    tables = pbc_loan_tables(index or "")
+    if not tables:
+        print("  ⚠️ 央行统计数据页没有信贷收支统计入口")
+        return None, None
+    series = {}
+    for year, url in tables[:max_years]:
+        months = pbc_loan_year(url)
+        if months is None:
+            print(f"  ⚠️ 央行 {year} 年信贷收支表没有打开")
+            return None, None
+        series.update(months)
+        value, date = balance_yoy(series)
+        if value is not None:
+            print(f"  央行各项贷款余额 {series[date]:.2f} 亿元，截至 {date}")
+            return value, date
+    return None, None
+
 NBS_RELEASES = 'https://www.stats.gov.cn/sj/zxfb/'
 
 
@@ -661,9 +766,10 @@ def fetch_indicators():
         v, d = cfg_fallback('m1')
     results['m1'] = {'value': v, 'date': d, 'source': '中国人民银行', 'auto_fetched': auto}
 
-    # ── 人民币贷款余额同比（akshare 此前工作正常）──
-    v, d, auto = None, None, False
-    if HAS_AK:
+    # ── 人民币贷款余额同比：央行信贷收支表 → 同花顺（akshare）→ 回退 ──
+    v, d = rmb_loan_reading()
+    auto = v is not None
+    if not auto and HAS_AK:
         try:
             df = ak.macro_rmb_loan()
             latest = df.iloc[-1]
