@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-06",
+  "date": "2026-11-07",
   "temperature": 55.6,
   "band": "温和区",
   "emoji": "🌤️",
@@ -53,7 +53,7 @@
       "unit": "%",
       "reference_range": "0.5%~3.0%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "ppi": {
@@ -72,7 +72,7 @@
       "unit": "%",
       "reference_range": "-2%~3%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "pmi": {
@@ -91,7 +91,7 @@
       "unit": "",
       "reference_range": "48~55",
       "stale": false,
-      "stale_days": 22,
+      "stale_days": 23,
       "auto": true
     },
     "pmi_nonmfg": {
@@ -110,7 +110,7 @@
       "unit": "",
       "reference_range": "48~55",
       "stale": false,
-      "stale_days": 22,
+      "stale_days": 23,
       "auto": true
     },
     "retail_sales": {
@@ -129,7 +129,7 @@
       "unit": "%",
       "reference_range": "3%~10%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "electricity": {
@@ -148,7 +148,7 @@
       "unit": "%",
       "reference_range": "2%~8%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "fixed_asset_investment": {
@@ -167,7 +167,7 @@
       "unit": "%",
       "reference_range": "3%~8%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "unemployment": {
@@ -186,7 +186,7 @@
       "unit": "%",
       "reference_range": "4.5%~5.5%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "consumer_confidence": {
@@ -205,7 +205,7 @@
       "unit": "",
       "reference_range": "92~105",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "disposable_income": {
@@ -224,7 +224,7 @@
       "unit": "%",
       "reference_range": "4%~7%",
       "stale": false,
-      "stale_days": 310,
+      "stale_days": 311,
       "auto": true
     },
     "m2": {
@@ -243,7 +243,7 @@
       "unit": "%",
       "reference_range": "8%~12%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "m1": {
@@ -262,7 +262,7 @@
       "unit": "%",
       "reference_range": "2%~10%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "rmb_loan": {
@@ -281,8 +281,8 @@
       "unit": "%",
       "reference_range": "8%~14%",
       "stale": false,
-      "stale_days": 52,
-      "auto": false
+      "stale_days": 53,
+      "auto": true
     },
     "social_financing": {
       "score": 25,
@@ -300,14 +300,14 @@
       "unit": "%",
       "reference_range": "0%~15%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "bond_yield": {
       "score": 30,
       "label": "低",
-      "value": 1.6038,
-      "date": "2026-11-05",
+      "value": 1.5868,
+      "date": "2026-11-06",
       "source": "东方财富（中国国债收益率）",
       "source_url": null,
       "weight": 0.02,
@@ -338,7 +338,7 @@
       "unit": "%",
       "reference_range": "3.0%~4.5%",
       "stale": false,
-      "stale_days": 17,
+      "stale_days": 18,
       "auto": true
     },
     "industrial_output": {
@@ -357,7 +357,7 @@
       "unit": "%",
       "reference_range": "4%~8%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "export": {
@@ -376,7 +376,7 @@
       "unit": "%",
       "reference_range": "3%~10%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "import_yoy": {
@@ -395,7 +395,7 @@
       "unit": "%",
       "reference_range": "0%~10%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     },
     "currency_index": {
@@ -414,7 +414,7 @@
       "unit": "",
       "reference_range": "95~105",
       "stale": false,
-      "stale_days": 7,
+      "stale_days": 8,
       "auto": true
     },
     "ai_market_share": {
@@ -452,7 +452,7 @@
       "unit": "%",
       "reference_range": "30%~60%",
       "stale": false,
-      "stale_days": 52,
+      "stale_days": 53,
       "auto": true
     }
   }
