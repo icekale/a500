@@ -1,19 +1,19 @@
 {
-  "pe": 8.52,
-  "pe_date": "2026-11-05",
+  "pe": 8.61,
+  "pe_date": "2026-11-06",
   "pe_percentile": 90,
-  "dividend_yield": 4.7,
-  "dividend_yield_date": "2026-11-05",
-  "dividend_yield_percentile": 100,
-  "pb": 0.98,
-  "roe": 11.9,
-  "bond_yield": 1.6038,
-  "spread": 3.1,
-  "etf_price": 1.2,
-  "etf_premium": -0.17,
-  "etf_volume": 437006684.0,
-  "etf_size": 144.2,
-  "etf_update_time": "2026-11-05 16:11:33+08:00",
+  "dividend_yield": 4.65,
+  "dividend_yield_date": "2026-11-06",
+  "dividend_yield_percentile": 95,
+  "pb": 0.99,
+  "roe": 11.7,
+  "bond_yield": 1.5868,
+  "spread": 3.06,
+  "etf_price": 1.214,
+  "etf_premium": -0.06,
+  "etf_volume": 315727653.0,
+  "etf_size": 145.44,
+  "etf_update_time": "2026-11-06 16:11:33+08:00",
   "light": "green",
   "light_score": 73,
   "light_label": "适合买入",
@@ -434,7 +434,7 @@
       "t": 90
     },
     {
-      "d": "2026-11-05",
+      "d": "2026-11-06",
       "t": 90
     }
   ],
@@ -766,7 +766,11 @@
     {
       "d": "2026-11-05",
       "v": 4.7
+    },
+    {
+      "d": "2026-11-06",
+      "v": 4.65
     }
   ],
-  "update_time": "2026-11-05 23:52"
+  "update_time": "2026-11-06 23:26"
 }
