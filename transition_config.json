@@ -1,6 +1,6 @@
 {
-  "_comment": "中国经济健康度温度计 v0.5 - 4线22指标框架（东财直连优先 + 自愈回退）",
-  "version": "0.5",
+  "_comment": "中国经济健康度温度计 v0.6 - 4线21指标框架（东财直连优先 + 自愈回退）",
+  "version": "0.6",
   "last_updated": "2026-11-07",
   "weights": {
     "line1_demand_price": 0.3,
@@ -595,7 +595,7 @@
     "industrial_output": {
       "name": "工业增加值同比",
       "line": 4,
-      "weight": 0.06,
+      "weight": 0.075,
       "data_source": "Trading Economics",
       "auto_fetch": true,
       "frequency": "月",
@@ -646,7 +646,7 @@
     "export": {
       "name": "出口同比增速",
       "line": 4,
-      "weight": 0.05,
+      "weight": 0.0625,
       "data_source": "Trading Economics",
       "auto_fetch": true,
       "frequency": "月",
@@ -691,7 +691,7 @@
     "currency_index": {
       "name": "人民币CFETS汇率指数",
       "line": 4,
-      "weight": 0.05,
+      "weight": 0.0625,
       "data_source": "中国外汇交易中心",
       "auto_fetch": true,
       "frequency": "周",
@@ -733,57 +733,10 @@
       "last_known_value": 103.77,
       "last_known_date": "2026-10-30"
     },
-    "ai_market_share": {
-      "name": "中国AI模型OpenRouter调用份额",
-      "line": 4,
-      "weight": 0.06,
-      "data_source": "OpenRouter",
-      "auto_fetch": false,
-      "included": false,
-      "exclusion_reason": "缺少可核验的调用量数据，暂不计分",
-      "frequency": "周",
-      "unit": "%",
-      "reference_range": "10%~40%",
-      "thresholds": [
-        {
-          "min": -999,
-          "max": 10,
-          "score": 10,
-          "label": "低"
-        },
-        {
-          "min": 10,
-          "max": 20,
-          "score": 30,
-          "label": "较低"
-        },
-        {
-          "min": 20,
-          "max": 30,
-          "score": 55,
-          "label": "中等"
-        },
-        {
-          "min": 30,
-          "max": 40,
-          "score": 75,
-          "label": "较高"
-        },
-        {
-          "min": 40,
-          "max": 999,
-          "score": 100,
-          "label": "领先"
-        }
-      ],
-      "manual_fallback": null,
-      "last_known_value": null,
-      "last_known_date": null
-    },
     "new_energy_penetration": {
       "name": "乘联会狭义乘用车新能源零售渗透率",
       "line": 4,
-      "weight": 0.04,
+      "weight": 0.05,
       "data_source": "乘联会（狭义乘用车零售）",
       "auto_fetch": true,
       "frequency": "月",
@@ -1088,7 +1041,7 @@
     "import_yoy": {
       "name": "进口同比增速",
       "line": 4,
-      "weight": 0.04,
+      "weight": 0.05,
       "data_source": "海关总署",
       "auto_fetch": true,
       "frequency": "月",

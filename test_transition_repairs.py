@@ -28,33 +28,35 @@ class TransitionRepairsTest(unittest.TestCase):
                     'source': c['data_source'], 'auto_fetched': False}
                 for k, c in self.config['indicators'].items()}
 
-    def test_ai_old_value_never_scores_or_heals_and_collection_skips_openrouter(self):
+    def test_retired_ai_never_scores_or_heals_and_collection_skips_openrouter(self):
+        self.assertNotIn('ai_market_share', self.config['indicators'])
         results = self.readings()
-        results['ai_market_share'] = {'value': 46.6, 'date': '2020-01-01', 'auto_fetched': True}
-        ai = fetcher.build_output(results)['indicators']['ai_market_share']
-        self.assertIsNone(ai['value'])
-        self.assertIsNone(ai['score'])
-        self.assertFalse(ai['included'])
-        self.assertFalse(ai['auto'])
-        self.assertEqual(ai['weight'], 0)
-        self.assertEqual(ai['configured_weight'], 0.06)
-        self.assertEqual(ai['exclusion_reason'], '缺少可核验的调用量数据，暂不计分')
+        expected = fetcher.build_output(results)
+        results['ai_market_share'] = {'value': 99, 'date': '2020-01-01', 'auto_fetched': True, 'included': True}
+        self.assertNotIn('ai_market_share', fetcher.compute_scores(results))
+        self.assertEqual(fetcher.build_output(results), expected)
+        before = copy.deepcopy(self.config)
         with tempfile.TemporaryDirectory() as directory, patch.object(fetcher, 'CONFIG_PATH', str(Path(directory) / 'config.json')):
             fetcher.heal_config({'ai_market_share': results['ai_market_share']})
             self.assertFalse((Path(directory) / 'config.json').exists())
-        self.assertEqual(fetcher.cfg_fallback('ai_market_share'), (None, None))
+        self.assertEqual(self.config, before)
         with patch.object(fetcher, 'HAS_AK', False), \
              patch.object(fetcher, 'em_get', return_value=None), \
              patch.object(fetcher, 'fetch_url', return_value=None) as get, \
              patch.object(fetcher, 'social_financing_reading', return_value=(None, None)), \
              patch.object(fetcher, 'rmb_loan_reading', return_value=(None, None)):
             collected = fetcher.fetch_indicators()
-        self.assertIsNone(collected['ai_market_share']['value'])
-        self.assertFalse(collected['ai_market_share']['included'])
+        self.assertNotIn('ai_market_share', collected)
+        self.assertEqual(set(collected), set(self.config['indicators']))
+        self.assertEqual(len(collected), 21)
         self.assertFalse(any('openrouter' in call.args[0] for call in get.call_args_list))
 
     def test_scoring_keeps_four_lines_and_reports_configured_coverage(self):
+        self.assertEqual(len(self.config['indicators']), 21)
         self.assertAlmostEqual(sum(c['weight'] for c in self.config['indicators'].values()), 1)
+        self.assertEqual({k: c['weight'] for k, c in self.config['indicators'].items() if c['line'] == 4},
+                         {'industrial_output': 0.075, 'export': 0.0625, 'currency_index': 0.0625,
+                          'new_energy_penetration': 0.05, 'import_yoy': 0.05})
         results = self.readings()
         # 固定本次评审样本；每日采集回写 config 后本回归仍检查同一组数。
         values = {'cpi': 0.9, 'ppi': 5.0, 'pmi': 49.3, 'pmi_nonmfg': 49.7,
@@ -62,36 +64,57 @@ class TransitionRepairsTest(unittest.TestCase):
                   'unemployment': 5.2, 'consumer_confidence': 89, 'disposable_income': 4.3,
                   'm2': 7.2, 'm1': 3.2, 'rmb_loan': 4.82, 'social_financing': -10.1,
                   'bond_yield': 1.6038, 'lpr': 3.0, 'industrial_output': 5.5, 'export': 36.3,
-                  'import_yoy': 31, 'currency_index': 103.77, 'new_energy_penetration': 67.0,
-                  'ai_market_share': None}
+                  'import_yoy': 31, 'currency_index': 103.77, 'new_energy_penetration': 67.0}
         for key, value in values.items():
             results[key]['value'] = value
+        results['cpi']['source_url'] = 'https://example.com/cpi'
         output = fetcher.build_output(results)
-        self.assertEqual(output['available_coverage'], 0.94)
-        self.assertEqual(output['excluded_indicators'], ['ai_market_share'])
-        self.assertEqual(output['lineScores']['line4']['available_coverage'], 0.8)
+        self.assertEqual(output['config_version'], self.config['version'])
+        self.assertEqual(output['config_version'], '0.6')
+        self.assertEqual(output['indicator_count'], 21)
+        self.assertEqual(output['available_coverage'], 1)
+        self.assertEqual(output['excluded_indicators'], [])
+        self.assertIn('覆盖率按现行配置权重（线内可用指标仍按原相对权重归一）', output['scoring_method'])
         expected = 0
         for lid, wkey in fetcher.LINE_WEIGHT_KEYS.items():
             items = [s for s in output['indicators'].values() if s['line'] == lid and s['included']]
             weight = self.config['weights'][wkey]
+            self.assertEqual(weight, {1: 0.3, 2: 0.15, 3: 0.25, 4: 0.3}[lid])
+            self.assertEqual(self.config['lines'][f'line{lid}']['weight'], weight)
+            self.assertAlmostEqual(sum(s['configured_weight'] for s in items), weight)
             self.assertAlmostEqual(sum(s['weight'] for s in items), weight)
             line_score = sum(s['score'] * s['configured_weight'] for s in items) / sum(s['configured_weight'] for s in items)
             expected += weight * line_score
             self.assertEqual(output['lineScores'][f'line{lid}']['score'], round(line_score, 1))
             self.assertEqual(output['lineScores'][f'line{lid}']['weight'], weight * 100)
+            self.assertEqual(output['lineScores'][f'line{lid}']['available_coverage'], 1)
         self.assertEqual(output['temperature'], round(expected, 1))
         self.assertEqual(output['temperature'], 55.6)
         for key, item in output['indicators'].items():
             self.assertEqual(item['unit'], self.config['indicators'][key]['unit'])
             self.assertEqual(item['reference_range'], self.config['indicators'][key]['reference_range'])
-        # 原54.5的22项完整框架仍是相同算法；只在缺失时采用线内归一。
-        self.config['indicators']['ai_market_share']['included'] = True
-        results['ai_market_share']['value'] = 46.6
-        results['new_energy_penetration']['value'] = 41.8
-        results['fixed_asset_investment']['value'] = -10.1
-        complete = fetcher.build_output(results)
-        self.assertEqual(complete['temperature'], 54.5)
-        self.assertEqual(complete['available_coverage'], 1)
+            for field in ('value', 'date', 'source', 'source_url'):
+                self.assertEqual(item[field], results[key].get(field))
+        # 还原迁移前配置：AI仍占6%但被排除，主线四有效权重为24%。
+        old_config = copy.deepcopy(self.config)
+        old_config['version'] = '0.5'
+        for c in old_config['indicators'].values():
+            if c['line'] == 4:
+                c['weight'] /= 1.25
+        old_config['indicators']['ai_market_share'] = {
+            'name': '退役AI调用份额', 'line': 4, 'weight': 0.06, 'included': False}
+        with patch.object(fetcher, 'CONFIG', old_config):
+            previous = fetcher.build_output(results)
+        self.assertEqual(previous['config_version'], '0.5')
+        self.assertEqual(previous['indicator_count'], 22)
+        self.assertEqual(previous['available_coverage'], 0.94)
+        self.assertEqual(previous['lineScores']['line4']['available_coverage'], 0.8)
+        self.assertEqual(previous['temperature'], output['temperature'])
+        for lid in output['lineScores']:
+            self.assertEqual(previous['lineScores'][lid]['score'], output['lineScores'][lid]['score'])
+        for key, item in output['indicators'].items():
+            self.assertEqual(previous['indicators'][key]['score'], item['score'])
+            self.assertAlmostEqual(previous['indicators'][key]['weight'], item['weight'])
 
     def test_missing_and_all_excluded_never_get_neutral_scores(self):
         results = self.readings()
@@ -102,7 +125,8 @@ class TransitionRepairsTest(unittest.TestCase):
         self.assertIsNone(output['indicators']['cpi']['score'])
         self.assertEqual(list(output['indicators']), [*results, 'cpi'])
         self.assertIsNone(output['indicators']['pmi']['value'])
-        self.assertEqual(output['available_coverage'], 0.84)
+        self.assertEqual(output['available_coverage'], 0.9)
+        self.assertEqual(set(output['excluded_indicators']), {'cpi', 'pmi'})
         results = self.readings()
         for key, c in self.config['indicators'].items():
             if c['line'] == 4:
@@ -116,10 +140,20 @@ class TransitionRepairsTest(unittest.TestCase):
             output = fetcher.build_output(empty)
             self.assertIsNone(output['temperature'])
             self.assertEqual(output['available_coverage'], 0)
-            self.assertEqual(len(output['excluded_indicators']), 22)
+            self.assertEqual(len(output['excluded_indicators']), 21)
             self.assertTrue(all(s['score'] is None for s in output['lineScores'].values()))
             self.assertEqual(output['band'], '暂无数据')
             json.dumps(output, allow_nan=False)
+
+    def test_missing_industrial_output_uses_rebalanced_coverage(self):
+        results = self.readings()
+        results.pop('industrial_output')
+        output = fetcher.build_output(results)
+        self.assertEqual(output['available_coverage'], 0.925)
+        self.assertEqual(output['lineScores']['line4']['available_coverage'], 0.75)
+        self.assertEqual(output['excluded_indicators'], ['industrial_output'])
+        self.assertIsNone(output['indicators']['industrial_output']['score'])
+        self.assertAlmostEqual(sum(s['weight'] for s in output['indicators'].values() if s['line'] == 4), 0.3)
 
     def test_nev_uses_same_month_retail_and_skips_nan_without_shifting_rows(self):
         fuel = [{'月份': '1月', '2020年': 20}, {'月份': '2月', '2020年': float('nan')},
@@ -244,7 +278,7 @@ class TransitionRepairsTest(unittest.TestCase):
         for key in results:
             results[key]['auto_fetched'] = True
         results['rmb_loan'].update(auto_fetched=False, value=4.82, date='2026-09')
-        results['ai_market_share']['auto_fetched'] = False  # 配置里排除，不算回退
+        results['ai_market_share'] = {'value': 99, 'included': True, 'auto_fetched': False}  # 旧结果不计入现行回退
         self.config['indicators']['lpr']['auto_fetch'] = False
         results['lpr']['auto_fetched'] = False  # 本就手填，不报
         fallbacks = fetcher.fallback_indicators(results)
@@ -291,7 +325,7 @@ class TransitionRepairsTest(unittest.TestCase):
         for value, date in [(float('nan'), '2020-01'), (1, 'bad-date'), (1, '2020-02-30')]:
             c.update(manual_fallback=value, last_known_date=date)
             self.assertEqual(fetcher.cfg_fallback('cpi'), (None, None))
-        self.assertTrue(all(fetcher.observation_date(c['last_known_date']) for key, c in self.config['indicators'].items() if key not in ('ai_market_share', 'cpi')))
+        self.assertTrue(all(fetcher.observation_date(c['last_known_date']) for key, c in self.config['indicators'].items() if key != 'cpi'))
 
     def test_public_aggregator_passes_contract_through_without_loss(self):
         output = fetcher.build_output(self.readings())
@@ -302,7 +336,9 @@ class TransitionRepairsTest(unittest.TestCase):
             aggregator.main()
             payload = json.loads((Path(directory) / 'vpush_data.json').read_text())
         self.assertEqual(payload['transition'], output)
-        self.assertIsNone(payload['transition']['indicators']['ai_market_share']['score'])
+        self.assertNotIn('ai_market_share', payload['transition']['indicators'])
+        self.assertEqual(payload['transition']['config_version'], self.config['version'])
+        self.assertEqual(payload['transition']['indicator_count'], 21)
         self.assertEqual(payload['transition']['indicators']['pmi']['unit'], '')
 
 

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-const reason = '缺少可核验的调用量数据，暂不计分';
+const reason = '缺少可核验的数据，暂不计分';
 const fixture = {
   temperature: 55.6, emoji: '🌤️', band: '温和区', description: '测试', available_coverage: 0.94,
   lineScores: Object.fromEntries([1, 2, 3, 4].map(n => [`line${n}`, {name: `主线${n}`, score: 60, weight: [30, 15, 25, 30][n - 1]}])),
@@ -11,7 +11,7 @@ const fixture = {
     pmi: {name: '制造业PMI', line: 1, score: 40, value: 49.3, unit: '', reference_range: '48~55', included: true, auto: true, weight: 0.05, date: '2020-09', source: '测试'},
     new_energy_penetration: {name: '乘联会狭义乘用车新能源零售渗透率', line: 4, score: 100, value: 67, unit: '%', included: true, auto: true, weight: 0.05, date: '2020-09', source: '乘联会'},
     export: {name: '出口', line: 4, score: 70, value: 7, unit: '%', included: true, auto: true, weight: 0.0625, date: '2020-09', source: '测试'},
-    ai_market_share: {name: '中国AI模型OpenRouter调用份额', line: 4, score: null, value: null, date: null, included: false, weight: 0, configured_weight: 0.06, exclusion_reason: reason, auto: false, stale: true},
+    pending_indicator: {name: '待核验指标', line: 4, score: null, value: null, date: null, included: false, weight: 0, configured_weight: 0.06, exclusion_reason: reason, auto: false, stale: true},
   },
 };
 Object.values(fixture.indicators).forEach(s => s.label = s.included ? '正常' : '暂不计分');
@@ -45,10 +45,30 @@ for (const file of ['a500_template.html', 'index.html']) {
   assert.ok(Number.isFinite(nodes.transArc.style.strokeDashoffset));
   const legacy = structuredClone(fixture);
   delete legacy.available_coverage;
-  delete legacy.indicators.ai_market_share;
+  delete legacy.indicators.pending_indicator;
   Object.values(legacy.indicators).forEach(s => {delete s.included; delete s.unit; delete s.reference_range;});
   context.renderTrans(legacy);
   assert.doesNotMatch(html(), /\b(?:null|undefined|NaN)\b/);
   assert.match(nodes.transGroup4.innerHTML, /67/);
-  console.log(`${file}: script syntax + included/null/legacy rendering passed`);
+  const current = structuredClone(fixture);
+  current.config_version = '0.6'; current.indicator_count = 21; current.available_coverage = 1;
+  delete current.indicators.pending_indicator;
+  context.renderTrans(current);
+  assert.match(nodes.transDesc.innerHTML, /100% · 按现行配置权重/);
+  assert.match(nodes.transDesc.innerHTML, /不代表数据新鲜度/);
+  assert.doesNotMatch(html(), /中国AI|OpenRouter|已退役/);
+  current.available_coverage = .925;
+  current.indicators.pending_indicator = fixture.indicators.pending_indicator;
+  context.renderTrans(current);
+  assert.match(nodes.transDesc.innerHTML, /92\.5% · 按现行配置权重/);
+  assert.match(nodes.transGroup4.innerHTML, new RegExp(reason));
+  const retired = structuredClone(fixture);
+  delete retired.indicators.pending_indicator;
+  retired.indicators.ai_market_share = { ...fixture.indicators.pending_indicator, name: '中国AI模型OpenRouter调用份额' };
+  const before = JSON.stringify(retired);
+  context.renderTrans(retired);
+  assert.equal(JSON.stringify(retired), before);
+  assert.match(nodes.transDesc.innerHTML, /94% · 按原配置权重.*旧版统计含已退役项，待数据更新/);
+  assert.doesNotMatch(html(), /中国AI|OpenRouter|实际权重0% · 配置权重6%/);
+  console.log(`${file}: current/partial/retired/null coverage and script syntax passed`);
 }

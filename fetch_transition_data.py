@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-中国经济「健康度温度计」· 数据抓取与打分脚本 v0.5
+中国经济「健康度温度计」· 数据抓取与打分脚本 v0.6
 ============================================
-4线22指标框架：内需与物价(30%) / 就业与收入(15%) / 货币与信用(25%) / 转型与开放(30%)
+4线21指标框架：内需与物价(30%) / 就业与收入(15%) / 货币与信用(25%) / 转型与开放(30%)
 
 v0.5 升级要点（解决"数据不更新"问题）：
 1. 东方财富数据中心 API 直连作为首选源（带重试），akshare 降级为备用
@@ -857,12 +857,6 @@ def fetch_indicators():
         v, d = cfg_fallback('currency_index')
     results['currency_index'] = {'value': v, 'date': d, 'source': '中国外汇交易中心', 'auto_fetched': auto}
 
-    # 词频不是调用量：暂停采集和回退，保留卡片与原配置权重。
-    results['ai_market_share'] = {
-        'value': None, 'date': None, 'source': 'OpenRouter', 'auto_fetched': False,
-        'included': False, 'exclusion_reason': '缺少可核验的调用量数据，暂不计分',
-    }
-
     results['new_energy_penetration'] = fetch_nev_reading()
 
     return results
@@ -1007,10 +1001,11 @@ def build_output(results):
         }
     return {
         'date': datetime.now().strftime('%Y-%m-%d'), 'temperature': temp,
+        'config_version': CONFIG['version'], 'indicator_count': len(CONFIG['indicators']),
         'band': band, 'emoji': emoji, 'color': color, 'description': desc,
         'available_coverage': round(available_weight / total_weight, 6) if total_weight else 0,
         'excluded_indicators': [k for k, s in scores.items() if not s['included']],
-        'scoring_method': '四主线保留30%/15%/25%/30%名义权重，线内按可计分指标配置权重重新归一；整线缺失时仅在有分主线间归一，全部缺失则不出分。覆盖率按原配置权重计算，包含有效回退值，不代表数据新鲜度。',
+        'scoring_method': '四主线保留30%/15%/25%/30%名义权重，线内按可计分指标配置权重重新归一；整线缺失时仅在有分主线间归一，全部缺失则不出分。覆盖率按现行配置权重（线内可用指标仍按原相对权重归一），包含有效回退值，不代表数据新鲜度。',
         'lineScores': lines,
         'indicators': {k: {**{field: value for field, value in s.items() if field != 'auto_fetched'},
                            'auto': s['auto_fetched']} for k, s in scores.items()},
