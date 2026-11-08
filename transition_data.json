@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-07",
+  "date": "2026-11-08",
   "temperature": 55.6,
   "config_version": "0.6",
   "indicator_count": 21,
@@ -53,7 +53,7 @@
       "unit": "%",
       "reference_range": "0.5%~3.0%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "ppi": {
@@ -72,7 +72,7 @@
       "unit": "%",
       "reference_range": "-2%~3%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "pmi": {
@@ -91,7 +91,7 @@
       "unit": "",
       "reference_range": "48~55",
       "stale": false,
-      "stale_days": 23,
+      "stale_days": 24,
       "auto": true
     },
     "pmi_nonmfg": {
@@ -110,7 +110,7 @@
       "unit": "",
       "reference_range": "48~55",
       "stale": false,
-      "stale_days": 23,
+      "stale_days": 24,
       "auto": true
     },
     "retail_sales": {
@@ -129,7 +129,7 @@
       "unit": "%",
       "reference_range": "3%~10%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "electricity": {
@@ -148,7 +148,7 @@
       "unit": "%",
       "reference_range": "2%~8%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "fixed_asset_investment": {
@@ -167,7 +167,7 @@
       "unit": "%",
       "reference_range": "3%~8%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "unemployment": {
@@ -186,7 +186,7 @@
       "unit": "%",
       "reference_range": "4.5%~5.5%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "consumer_confidence": {
@@ -205,7 +205,7 @@
       "unit": "",
       "reference_range": "92~105",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "disposable_income": {
@@ -224,7 +224,7 @@
       "unit": "%",
       "reference_range": "4%~7%",
       "stale": false,
-      "stale_days": 311,
+      "stale_days": 312,
       "auto": true
     },
     "m2": {
@@ -243,7 +243,7 @@
       "unit": "%",
       "reference_range": "8%~12%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "m1": {
@@ -262,7 +262,7 @@
       "unit": "%",
       "reference_range": "2%~10%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "rmb_loan": {
@@ -281,7 +281,7 @@
       "unit": "%",
       "reference_range": "8%~14%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "social_financing": {
@@ -300,7 +300,7 @@
       "unit": "%",
       "reference_range": "0%~15%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "bond_yield": {
@@ -319,7 +319,7 @@
       "unit": "%",
       "reference_range": "1.8%~3.5%",
       "stale": false,
-      "stale_days": 1,
+      "stale_days": 2,
       "auto": true
     },
     "lpr": {
@@ -338,7 +338,7 @@
       "unit": "%",
       "reference_range": "3.0%~4.5%",
       "stale": false,
-      "stale_days": 18,
+      "stale_days": 19,
       "auto": true
     },
     "industrial_output": {
@@ -357,7 +357,7 @@
       "unit": "%",
       "reference_range": "4%~8%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "export": {
@@ -376,7 +376,7 @@
       "unit": "%",
       "reference_range": "3%~10%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "import_yoy": {
@@ -395,7 +395,7 @@
       "unit": "%",
       "reference_range": "0%~10%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     },
     "currency_index": {
@@ -414,7 +414,7 @@
       "unit": "",
       "reference_range": "95~105",
       "stale": false,
-      "stale_days": 8,
+      "stale_days": 9,
       "auto": true
     },
     "new_energy_penetration": {
@@ -433,7 +433,7 @@
       "unit": "%",
       "reference_range": "30%~60%",
       "stale": false,
-      "stale_days": 53,
+      "stale_days": 54,
       "auto": true
     }
   }
