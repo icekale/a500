@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.6 - 4线21指标框架（东财直连优先 + 自愈回退）",
   "version": "0.6",
-  "last_updated": "2026-11-07",
+  "last_updated": "2026-11-10",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -90,9 +90,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 0.9,
-      "last_known_value": 0.9,
-      "last_known_date": "2026-09"
+      "manual_fallback": 0.7,
+      "last_known_value": 0.7,
+      "last_known_date": "2026-10"
     },
     "ppi": {
       "name": "PPI同比",
@@ -141,9 +141,9 @@
           "label": "扩张"
         }
       ],
-      "manual_fallback": 5.0,
-      "last_known_value": 5.0,
-      "last_known_date": "2026-09"
+      "manual_fallback": 5.7,
+      "last_known_value": 5.7,
+      "last_known_date": "2026-10"
     },
     "pmi": {
       "name": "制造业PMI",
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.5868,
-      "last_known_value": 1.5868,
-      "last_known_date": "2026-11-06"
+      "manual_fallback": 1.5874,
+      "last_known_value": 1.5874,
+      "last_known_date": "2026-11-09"
     },
     "lpr": {
       "name": "1年期LPR",
@@ -729,9 +729,9 @@
           "label": "过强"
         }
       ],
-      "manual_fallback": 103.77,
-      "last_known_value": 103.77,
-      "last_known_date": "2026-10-30"
+      "manual_fallback": 103.65,
+      "last_known_value": 103.65,
+      "last_known_date": "2026-11-06"
     },
     "new_energy_penetration": {
       "name": "乘联会狭义乘用车新能源零售渗透率",
