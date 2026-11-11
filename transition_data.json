@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-11",
+  "date": "2026-11-12",
   "temperature": 55.6,
   "config_version": "0.6",
   "indicator_count": 21,
@@ -53,7 +53,7 @@
       "unit": "%",
       "reference_range": "0.5%~3.0%",
       "stale": false,
-      "stale_days": 27,
+      "stale_days": 28,
       "auto": true
     },
     "ppi": {
@@ -72,7 +72,7 @@
       "unit": "%",
       "reference_range": "-2%~3%",
       "stale": false,
-      "stale_days": 27,
+      "stale_days": 28,
       "auto": true
     },
     "pmi": {
@@ -91,7 +91,7 @@
       "unit": "",
       "reference_range": "48~55",
       "stale": false,
-      "stale_days": 27,
+      "stale_days": 28,
       "auto": true
     },
     "pmi_nonmfg": {
@@ -110,7 +110,7 @@
       "unit": "",
       "reference_range": "48~55",
       "stale": false,
-      "stale_days": 27,
+      "stale_days": 28,
       "auto": true
     },
     "retail_sales": {
@@ -129,7 +129,7 @@
       "unit": "%",
       "reference_range": "3%~10%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "electricity": {
@@ -148,8 +148,8 @@
       "unit": "%",
       "reference_range": "2%~8%",
       "stale": false,
-      "stale_days": 57,
-      "auto": true
+      "stale_days": 58,
+      "auto": false
     },
     "fixed_asset_investment": {
       "score": 20,
@@ -167,7 +167,7 @@
       "unit": "%",
       "reference_range": "3%~8%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "unemployment": {
@@ -186,7 +186,7 @@
       "unit": "%",
       "reference_range": "4.5%~5.5%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "consumer_confidence": {
@@ -205,7 +205,7 @@
       "unit": "",
       "reference_range": "92~105",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "disposable_income": {
@@ -224,7 +224,7 @@
       "unit": "%",
       "reference_range": "4%~7%",
       "stale": false,
-      "stale_days": 315,
+      "stale_days": 316,
       "auto": true
     },
     "m2": {
@@ -243,7 +243,7 @@
       "unit": "%",
       "reference_range": "8%~12%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "m1": {
@@ -262,7 +262,7 @@
       "unit": "%",
       "reference_range": "2%~10%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "rmb_loan": {
@@ -281,7 +281,7 @@
       "unit": "%",
       "reference_range": "8%~14%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "social_financing": {
@@ -300,14 +300,14 @@
       "unit": "%",
       "reference_range": "0%~15%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "bond_yield": {
       "score": 30,
       "label": "低",
-      "value": 1.5965,
-      "date": "2026-11-10",
+      "value": 1.6039,
+      "date": "2026-11-11",
       "source": "东方财富（中国国债收益率）",
       "source_url": null,
       "weight": 0.02,
@@ -338,7 +338,7 @@
       "unit": "%",
       "reference_range": "3.0%~4.5%",
       "stale": false,
-      "stale_days": 22,
+      "stale_days": 23,
       "auto": true
     },
     "industrial_output": {
@@ -357,7 +357,7 @@
       "unit": "%",
       "reference_range": "4%~8%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 58,
       "auto": true
     },
     "export": {
@@ -376,7 +376,7 @@
       "unit": "%",
       "reference_range": "3%~10%",
       "stale": false,
-      "stale_days": 27,
+      "stale_days": 28,
       "auto": true
     },
     "import_yoy": {
@@ -395,7 +395,7 @@
       "unit": "%",
       "reference_range": "0%~10%",
       "stale": false,
-      "stale_days": 27,
+      "stale_days": 28,
       "auto": true
     },
     "currency_index": {
@@ -414,14 +414,14 @@
       "unit": "",
       "reference_range": "95~105",
       "stale": false,
-      "stale_days": 5,
+      "stale_days": 6,
       "auto": true
     },
     "new_energy_penetration": {
       "score": 100,
       "label": "主导",
-      "value": 67.0,
-      "date": "2026-09",
+      "value": 67.6,
+      "date": "2026-10",
       "source": "乘联会（狭义乘用车零售）",
       "source_url": "http://data.cpcadata.com/api/chartlist?charttype=6",
       "weight": 0.05,
@@ -433,7 +433,7 @@
       "unit": "%",
       "reference_range": "30%~60%",
       "stale": false,
-      "stale_days": 57,
+      "stale_days": 28,
       "auto": true
     }
   }

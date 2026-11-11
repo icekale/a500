@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.6 - 4线21指标框架（东财直连优先 + 自愈回退）",
   "version": "0.6",
-  "last_updated": "2026-11-11",
+  "last_updated": "2026-11-12",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.5965,
-      "last_known_value": 1.5965,
-      "last_known_date": "2026-11-10"
+      "manual_fallback": 1.6039,
+      "last_known_value": 1.6039,
+      "last_known_date": "2026-11-11"
     },
     "lpr": {
       "name": "1年期LPR",
@@ -781,9 +781,9 @@
         }
       ],
       "_note": "同月狭义乘用车新能源零售/总零售；2026-09：108.3843/161.7989×100=67.0%。原41.8%混用零售和产量，已废弃。",
-      "last_known_value": 67.0,
-      "last_known_date": "2026-09",
-      "manual_fallback": 67.0,
+      "last_known_value": 67.6,
+      "last_known_date": "2026-10",
+      "manual_fallback": 67.6,
       "last_known_source_url": "http://data.cpcadata.com/api/chartlist?charttype=6",
       "denominator_source_url": "http://data.cpcadata.com/api/chartlist?charttype=1"
     },
