@@ -7,13 +7,13 @@
   "dividend_yield_percentile": 95,
   "pb": 0.99,
   "roe": 11.7,
-  "bond_yield": 1.6039,
+  "bond_yield": 1.6032,
   "spread": 3.09,
-  "etf_price": 1.21,
+  "etf_price": 1.208,
   "etf_premium": 0,
   "etf_volume": 260652827.0,
   "etf_size": 142.96,
-  "etf_update_time": "2026-11-11 15:34",
+  "etf_update_time": "2026-11-12 15:34",
   "light": "green",
   "light_score": 74,
   "light_label": "适合买入",
@@ -784,5 +784,5 @@
       "v": 4.69
     }
   ],
-  "update_time": "2026-11-11 23:40"
+  "update_time": "2026-11-13 00:22"
 }
