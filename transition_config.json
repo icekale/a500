@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.6 - 4线21指标框架（东财直连优先 + 自愈回退）",
   "version": "0.6",
-  "last_updated": "2026-11-12",
+  "last_updated": "2026-11-13",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.6039,
-      "last_known_value": 1.6039,
-      "last_known_date": "2026-11-11"
+      "manual_fallback": 1.6032,
+      "last_known_value": 1.6032,
+      "last_known_date": "2026-11-12"
     },
     "lpr": {
       "name": "1年期LPR",
