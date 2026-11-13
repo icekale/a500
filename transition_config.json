@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.6 - 4线21指标框架（东财直连优先 + 自愈回退）",
   "version": "0.6",
-  "last_updated": "2026-11-13",
+  "last_updated": "2026-11-14",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -441,9 +441,9 @@
           "label": "过度"
         }
       ],
-      "manual_fallback": 7.2,
-      "last_known_value": 7.2,
-      "last_known_date": "2026-09"
+      "manual_fallback": 7.1,
+      "last_known_value": 7.1,
+      "last_known_date": "2026-10"
     },
     "rmb_loan": {
       "name": "人民币贷款余额同比",
@@ -492,9 +492,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 4.82,
-      "last_known_value": 4.82,
-      "last_known_date": "2026-09"
+      "manual_fallback": 4.7,
+      "last_known_value": 4.7,
+      "last_known_date": "2026-10"
     },
     "bond_yield": {
       "name": "10年国债收益率",
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.6032,
-      "last_known_value": 1.6032,
-      "last_known_date": "2026-11-12"
+      "manual_fallback": 1.6123,
+      "last_known_value": 1.6123,
+      "last_known_date": "2026-11-13"
     },
     "lpr": {
       "name": "1年期LPR",
@@ -989,9 +989,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 3.2,
-      "last_known_value": 3.2,
-      "last_known_date": "2026-09"
+      "manual_fallback": 4.4,
+      "last_known_value": 4.4,
+      "last_known_date": "2026-10"
     },
     "social_financing": {
       "name": "社融增量同比",
@@ -1034,9 +1034,9 @@
           "label": "过快"
         }
       ],
-      "manual_fallback": -10.1,
-      "last_known_value": -10.1,
-      "last_known_date": "2026-09"
+      "manual_fallback": -7.7,
+      "last_known_value": -7.7,
+      "last_known_date": "2026-10"
     },
     "import_yoy": {
       "name": "进口同比增速",
