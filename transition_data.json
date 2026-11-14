@@ -339,7 +339,7 @@
       "reference_range": "3.0%~4.5%",
       "stale": false,
       "stale_days": 25,
-      "auto": true
+      "auto": false
     },
     "industrial_output": {
       "score": 70,
@@ -434,7 +434,7 @@
       "reference_range": "30%~60%",
       "stale": false,
       "stale_days": 30,
-      "auto": true
+      "auto": false
     }
   }
 }
