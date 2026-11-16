@@ -1,7 +1,7 @@
 {
   "_comment": "中国经济健康度温度计 v0.6 - 4线21指标框架（东财直连优先 + 自愈回退）",
   "version": "0.6",
-  "last_updated": "2026-11-14",
+  "last_updated": "2026-11-17",
   "weights": {
     "line1_demand_price": 0.3,
     "line2_employment_income": 0.15,
@@ -294,9 +294,9 @@
           "label": "旺盛"
         }
       ],
-      "manual_fallback": 1.1,
-      "last_known_value": 1.1,
-      "last_known_date": "2026-09"
+      "manual_fallback": 0.4,
+      "last_known_value": 0.4,
+      "last_known_date": "2026-10"
     },
     "unemployment": {
       "name": "城镇调查失业率",
@@ -345,9 +345,9 @@
           "label": "严峻"
         }
       ],
-      "manual_fallback": 5.2,
-      "last_known_value": 5.2,
-      "last_known_date": "2026-09"
+      "manual_fallback": 5.1,
+      "last_known_value": 5.1,
+      "last_known_date": "2026-10"
     },
     "disposable_income": {
       "name": "居民可支配收入累计同比",
@@ -537,9 +537,9 @@
           "label": "高"
         }
       ],
-      "manual_fallback": 1.6123,
-      "last_known_value": 1.6123,
-      "last_known_date": "2026-11-13"
+      "manual_fallback": 1.6285,
+      "last_known_value": 1.6285,
+      "last_known_date": "2026-11-16"
     },
     "lpr": {
       "name": "1年期LPR",
@@ -639,9 +639,9 @@
           "label": "过热"
         }
       ],
-      "manual_fallback": 5.5,
-      "last_known_value": 5.5,
-      "last_known_date": "2026-09"
+      "manual_fallback": 4.8,
+      "last_known_value": 4.8,
+      "last_known_date": "2026-10"
     },
     "export": {
       "name": "出口同比增速",
@@ -729,9 +729,9 @@
           "label": "过强"
         }
       ],
-      "manual_fallback": 103.65,
-      "last_known_value": 103.65,
-      "last_known_date": "2026-11-06"
+      "manual_fallback": 104.43,
+      "last_known_value": 104.43,
+      "last_known_date": "2026-11-13"
     },
     "new_energy_penetration": {
       "name": "乘联会狭义乘用车新能源零售渗透率",
@@ -885,10 +885,10 @@
           "label": "强劲"
         }
       ],
-      "manual_fallback": -7.2,
-      "last_known_value": -7.2,
-      "last_known_date": "2026-09",
-      "last_known_source_url": "https://www.stats.gov.cn/sj/zxfb/202610/t20261019_1965616.html",
+      "manual_fallback": -8.1,
+      "last_known_value": -8.1,
+      "last_known_date": "2026-10",
+      "last_known_source_url": "https://www.stats.gov.cn/sj/zxfb/202611/t20261116_1965841.html",
       "_note": "直接采用国家统计局发布的固定资产投资（不含农户）可比口径累计同比，不用历年累计金额相除。"
     },
     "consumer_confidence": {
