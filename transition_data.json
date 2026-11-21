@@ -147,7 +147,7 @@
       "name": "全社会用电量同比",
       "unit": "%",
       "reference_range": "2%~8%",
-      "stale": true,
+      "stale": false,
       "stale_days": 67,
       "auto": true
     },
@@ -204,7 +204,7 @@
       "name": "消费者信心指数",
       "unit": "",
       "reference_range": "92~105",
-      "stale": true,
+      "stale": false,
       "stale_days": 67,
       "auto": true
     },
@@ -326,7 +326,7 @@
       "score": 60,
       "label": "正常",
       "value": 3.0,
-      "date": "2026-10-20",
+      "date": "2026-11-20",
       "source": "全国银行间同业拆借中心",
       "source_url": null,
       "weight": 0.04,
@@ -338,8 +338,8 @@
       "unit": "%",
       "reference_range": "3.0%~4.5%",
       "stale": false,
-      "stale_days": 32,
-      "auto": false
+      "stale_days": 1,
+      "auto": true
     },
     "industrial_output": {
       "score": 40,
@@ -434,7 +434,7 @@
       "reference_range": "30%~60%",
       "stale": false,
       "stale_days": 37,
-      "auto": false
+      "auto": true
     }
   }
 }
