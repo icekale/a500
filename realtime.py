@@ -27,6 +27,18 @@ try:
 except Exception:
     ak = None   # 云端/精简环境未装 akshare 时，自动降级为新浪/腾讯源（纯标准库）
 
+
+def ak_call(*names, **kwargs):
+    """AKShare 1.20.4x 起批量改名，旧名一取就抛 AttributeError；按给定顺序（新名在前）找第一个存在的接口。"""
+    for name in names:
+        try:
+            fn = getattr(ak, name)
+        except AttributeError:
+            continue
+        return fn(**kwargs)
+    raise AttributeError(f"akshare 没有 {' / '.join(names)}")
+
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 BASELINE = os.path.join(DIR, "realtime_baseline.json")
 LASTGOOD = os.path.join(DIR, "realtime_last.json")
@@ -84,7 +96,7 @@ def _fetch_em():
     """东方财富（akshare）。akshare 不可用时直接跳过，交由新浪/腾讯源。"""
     if ak is None:
         return None, None
-    df = ak.stock_zh_index_spot_em(symbol='沪深重要指数')
+    df = ak_call('index_zh_spot_em', 'stock_zh_index_spot_em', symbol='沪深重要指数')
     row = df[df['名称'].astype(str).str.contains('A500|中证A500', na=False)]
     if not row.empty:
         return float(row.iloc[0]['最新价']), float(row.iloc[0]['涨跌幅'])

@@ -30,6 +30,23 @@ for k in list(os.environ.keys()):
 
 import akshare as ak
 
+
+def ak_call(*names, **kwargs):
+    """AKShare 1.20.4x 起批量改名，旧名一取就抛 AttributeError；按给定顺序（新名在前）找第一个存在的接口。"""
+    for name in names:
+        try:
+            fn = getattr(ak, name)
+        except AttributeError:
+            continue
+        return fn(**kwargs)
+    raise AttributeError(f"akshare 没有 {' / '.join(names)}")
+
+
+def last_valid(df, column):
+    """最后一行常只有美债没有中债，取该列最后一个有效值。"""
+    series = df[column].dropna()
+    return series.iloc[-1] if len(series) else None
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_JSON = os.path.join(DIR, "dividend_data.json")
 YIELD_HIST = os.path.join(DIR, "dividend_yield_history.json")
@@ -242,7 +259,7 @@ def fetch_pe_history():
     """
     try:
         end = datetime.now().strftime("%Y%m%d")
-        df = ak.stock_zh_index_hist_csindex(
+        df = ak_call('index_hist_csindex', 'stock_zh_index_hist_csindex',
             symbol=INDEX_CODE, start_date=PE_SAMPLE_START, end_date=end,
         )
         rows = pe_rows_from_df(df)
@@ -259,7 +276,7 @@ def fetch_pe_history():
 # ── B. 最新估值（PE/股息率） ──
 def fetch_latest_valuation():
     try:
-        df = ak.stock_zh_index_value_csindex(symbol=INDEX_CODE)
+        df = ak_call('index_value_csindex', 'stock_zh_index_value_csindex', symbol=INDEX_CODE)
         if df is None or len(df) == 0: return None, None, None, None
         latest = df.iloc[0]
         pe = safe_float(latest['市盈率1'])
@@ -351,11 +368,11 @@ def fetch_etf_gtimg():
 
 # ── D. 10年国债利率（利差用） ──
 def fetch_bond_yield():
-    """用 bond_zh_us_rate 获取10年国债利率（同transition脚本）"""
+    """用 bond_zh_us_yield_em（原 bond_zh_us_rate）获取10年国债利率（同transition脚本）"""
     try:
-        df = ak.bond_zh_us_rate()
+        df = ak_call('bond_zh_us_yield_em', 'bond_zh_us_rate')
         if df is None or len(df) == 0: return None
-        val = safe_float(df.iloc[-1]['中国国债收益率10年'])
+        val = safe_float(last_valid(df, '中国国债收益率10年'))
         print(f"  国债利率: {val}%")
         return val
     except Exception as e:

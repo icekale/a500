@@ -166,7 +166,7 @@ def fetch_bond_reading():
         return {'value': value, 'date': date, 'source': '东方财富（中国国债收益率）', 'auto_fetched': True}
     if HAS_AK:
         try:
-            rows = ak.bond_zh_us_rate().to_dict('records')
+            rows = ak_call('bond_zh_us_yield_em', 'bond_zh_us_rate').to_dict('records')
             value, date = latest_bond_reading(rows, '中国国债收益率10年', '日期')
             if value is not None and (not cached_date or date >= cached_date):
                 return {'value': value, 'date': date, 'source': '东方财富（经 AKShare）', 'auto_fetched': True}
@@ -656,17 +656,9 @@ def fetch_indicators():
 
     # ══════ 主线一：内需与物价 ══════
 
-    # ── CPI：东财直连 → akshare → 回退 ──
+    # ── CPI：东财直连 → 回退（AKShare 1.20.42 已删 *_yearly 系列）──
     v, d = em_field('RPT_ECONOMY_CPI', 'NATIONAL_SAME')
     auto = v is not None
-    if not auto and HAS_AK:
-        try:
-            df = ak.macro_china_cpi_yearly()
-            v = safe_float(df['今值'].iloc[-1])
-            d = str(df['日期'].iloc[-1])
-            auto = v is not None and is_cur_year(d)
-        except Exception as e:
-            source_failed("akshare macro_china_cpi_yearly", e)
     if not auto:
         v, d = cfg_fallback('cpi')
     results['cpi'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -674,14 +666,6 @@ def fetch_indicators():
     # ── PPI ──
     v, d = em_field('RPT_ECONOMY_PPI', 'BASE_SAME')
     auto = v is not None
-    if not auto and HAS_AK:
-        try:
-            df = ak.macro_china_ppi_yearly()
-            v = safe_float(df['今值'].iloc[-1])
-            d = str(df['日期'].iloc[-1])
-            auto = v is not None and is_cur_year(d)
-        except Exception as e:
-            source_failed("akshare macro_china_ppi_yearly", e)
     if not auto:
         v, d = cfg_fallback('ppi')
     results['ppi'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -689,14 +673,6 @@ def fetch_indicators():
     # ── 制造业PMI ──
     v, d = em_field('RPT_ECONOMY_PMI', 'MAKE_INDEX')
     auto = v is not None
-    if not auto and HAS_AK:
-        try:
-            df = ak.macro_china_pmi_yearly()
-            v = safe_float(df['制造业-指数'].iloc[-1])
-            d = str(df['月份'].iloc[-1])
-            auto = v is not None and is_cur_year(d)
-        except Exception as e:
-            source_failed("akshare macro_china_pmi_yearly", e)
     if not auto:
         v, d = cfg_fallback('pmi')
     results['pmi'] = {'value': v, 'date': d, 'source': '国家统计局', 'auto_fetched': auto}
@@ -806,15 +782,15 @@ def fetch_indicators():
     auto = v is not None
     if not auto and HAS_AK:
         try:
-            df = ak.macro_rmb_loan()
+            df = ak_call('macro_china_rmb_loan_ths', 'macro_rmb_loan')
             latest = df.iloc[-1]
-            g = re.search(r'([\d.]+)', str(latest['累计人民币贷款-同比']))
+            g = re.search(r'(-?[\d.]+)', str(latest['累计人民币贷款-同比']))
             if g:
                 v = safe_float(g.group(1))
             d = str(latest['月份']).replace('年', '-').replace('月', '')[:7]
             auto = v is not None
         except Exception as e:
-            source_failed("akshare macro_rmb_loan", e)
+            source_failed("akshare macro_china_rmb_loan_ths", e)
     if not auto:
         v, d = cfg_fallback('rmb_loan')
     results['rmb_loan'] = {'value': v, 'date': d, 'source': '中国人民银行', 'auto_fetched': auto}

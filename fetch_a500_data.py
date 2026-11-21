@@ -23,6 +23,23 @@ import akshare as ak
 import numpy as np
 import pandas as pd
 
+
+def ak_call(*names, **kwargs):
+    """AKShare 1.20.4x 起批量改名，旧名一取就抛 AttributeError；按给定顺序（新名在前）找第一个存在的接口。"""
+    for name in names:
+        try:
+            fn = getattr(ak, name)
+        except AttributeError:
+            continue
+        return fn(**kwargs)
+    raise AttributeError(f"akshare 没有 {' / '.join(names)}")
+
+
+def last_valid(df, column):
+    """最后一行常只有美债没有中债，取该列最后一个有效值。"""
+    series = df[column].dropna()
+    return series.iloc[-1] if len(series) else None
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE = os.path.join(DIR, "a500_template.html")
 # 唯一产物：既是 GitHub Pages 默认首页，也是本地 A500温度计.html 的源
@@ -68,8 +85,8 @@ def save_json(path: str, data: list):
 def fetch_bond_yield() -> float:
     """获取中国10年期国债收益率"""
     try:
-        df = ak.bond_zh_us_rate()
-        return round(float(df.iloc[-1]['中国国债收益率10年']), 2)
+        df = ak_call('bond_zh_us_yield_em', 'bond_zh_us_rate')
+        return round(float(last_valid(df, '中国国债收益率10年')), 2)
     except Exception as e:
         print(f"   ⚠️ 国债收益率获取失败: {e}，使用 1.74%")
         return 1.74
@@ -78,7 +95,7 @@ def fetch_bond_yield() -> float:
 def fetch_dividend_yield() -> float | None:
     """获取中证A500股息率（中证指数官方数据）"""
     try:
-        df = ak.stock_zh_index_value_csindex(symbol="000510")
+        df = ak_call("index_value_csindex", "stock_zh_index_value_csindex", symbol="000510")
         return round(float(df.iloc[0]['股息率1']), 2)
     except Exception as e:
         print(f"   ⚠️ 股息率获取失败: {e}")
@@ -93,7 +110,7 @@ def fetch_real_pe() -> tuple[float | None, str | None]:
     故历史序列由 pe_history.json 累积 + 按真实PE量级校准得到（见 pe_history 注释）。
     """
     try:
-        df = ak.stock_zh_index_value_csindex(symbol="000510")
+        df = ak_call("index_value_csindex", "stock_zh_index_value_csindex", symbol="000510")
         df = df.dropna(subset=["市盈率1"])
         if df.empty:
             return None, None
@@ -206,7 +223,7 @@ def update():
     price_stale = False
     price_fallback = False
     try:
-        df = ak.stock_zh_index_daily(symbol='sh000510')
+        df = ak_call('index_zh_daily_sina', 'stock_zh_index_daily', symbol='sh000510')
         df['date'] = pd.to_datetime(df['date'])
         df = df.sort_values('date').reset_index(drop=True)
 
