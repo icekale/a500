@@ -73,6 +73,16 @@ def safe_float(val, default=None):
     except Exception:
         return default
 
+def ak_call(*names, **kwargs):
+    """AKShare 1.20.4x 起批量改名，旧名一取就抛 AttributeError；按给定顺序（新名在前）找第一个存在的接口。"""
+    for name in names:
+        try:
+            fn = getattr(ak, name)
+        except AttributeError:
+            continue
+        return fn(**kwargs)
+    raise AttributeError(f"akshare 没有 {' / '.join(names)}")
+
 def source_failed(label, error):
     """数据源失败要留痕：以前这里一律 pass，换源失效好几周都看不出来。"""
     print(f"  ⚠️ {label} 失败: {type(error).__name__}: {str(error)[:200]}")
@@ -601,13 +611,30 @@ def latest_nev_retail_reading(fuel_rows, total_rows, year):
     return latest
 
 
+def latest_lpr_reading(rows):
+    """新接口列为 日期/1年期LPR，旧接口为 TRADE_DATE/LPR1Y；取最近一个有 1 年期报价的日子，不靠行序。"""
+    latest = (None, None)
+    for row in rows:
+        value = safe_float(row.get('1年期LPR', row.get('LPR1Y')))
+        date = str(row.get('日期', row.get('TRADE_DATE')) or '')[:10]
+        if value is None or observation_date(date) is None or len(date) != 10:
+            continue
+        if latest[1] is None or date > latest[1]:
+            latest = (value, date)
+    return latest
+
+
 def fetch_nev_reading():
     value, date = None, None
     if HAS_AK:
         try:
-            fuel = ak.car_market_fuel_cpca(symbol='整体市场').to_dict('records')
-            total = ak.car_market_total_cpca(symbol='狭义乘用车', indicator='零售').to_dict('records')
-            value, date = latest_nev_retail_reading(fuel, total, CUR_YEAR)
+            fuel = ak_call('alternative_car_market_fuel_cpca', 'car_market_fuel_cpca',
+                           symbol='整体市场').to_dict('records')
+            total = ak_call('alternative_car_market_total_cpca', 'car_market_total_cpca',
+                            symbol='狭义乘用车', indicator='零售').to_dict('records')
+            # 1 月初当年列还是空的，去年 12 月仍是最新一期。
+            readings = [latest_nev_retail_reading(fuel, total, year) for year in (CUR_YEAR, CUR_YEAR - 1)]
+            value, date = max(readings, key=lambda r: r[1] or '')
         except Exception as e:
             print(f'  ⚠️ 乘联会零售数据失败: {e}')
     auto = value is not None
@@ -806,13 +833,11 @@ def fetch_indicators():
     v, d, auto = None, None, False
     if HAS_AK:
         try:
-            df = ak.macro_china_lpr()
-            latest = df.iloc[-1]
-            v = safe_float(latest['LPR1Y'])
-            d = str(latest['TRADE_DATE'])
+            rows = ak_call('interest_rate_lpr_em', 'macro_china_lpr').to_dict('records')
+            v, d = latest_lpr_reading(rows)
             auto = v is not None
         except Exception as e:
-            source_failed("akshare macro_china_lpr", e)
+            source_failed("akshare interest_rate_lpr_em", e)
     if not auto:
         v, d = cfg_fallback('lpr')
     results['lpr'] = {'value': v, 'date': d, 'source': '全国银行间同业拆借中心', 'auto_fetched': auto}
@@ -865,11 +890,12 @@ def fetch_indicators():
 # 打分 / 过期判断 / 合成
 # ══════════════════════════════════════════════════════
 
-def compute_stale(date_str: str, frequency: str) -> dict:
+def compute_stale(date_str: str, frequency: str, max_days=None) -> dict:
+    """max_days 留给发布滞后长的月度数（用电量、消费者信心常在次月下旬甚至月底才出）。"""
     if not date_str:
         return {'stale': True, 'stale_days': 999}
     freq_days = {'日': 7, '周': 21, '月': 60, '季': 120, '年': 365}
-    max_days = freq_days.get(frequency, 60)
+    max_days = max_days or freq_days.get(frequency, 60)
     try:
         d_clean = str(date_str).replace('年', '-').replace('月', '-01').replace('.', '-').strip()
         for q, md in [('Q1', '-02-01'), ('Q2', '-05-01'), ('Q3', '-08-01'), ('Q4', '-11-01')]:
@@ -912,7 +938,7 @@ def compute_scores(results):
             'included': included, 'exclusion_reason': None if included else reason,
             'name': c['name'], 'unit': c.get('unit', ''),
             'reference_range': c.get('reference_range'),
-            **compute_stale(info.get('date') if included else None, c.get('frequency', '月')),
+            **compute_stale(info.get('date') if included else None, c.get('frequency', '月'), c.get('stale_after_days')),
         }
     # 保留四条主线的名义比例，先线内归一；整线缺失才在其余主线之间归一。
     line_available = {lid: sum(s['configured_weight'] for s in scores.values()

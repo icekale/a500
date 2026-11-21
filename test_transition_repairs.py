@@ -166,17 +166,49 @@ class TransitionRepairsTest(unittest.TestCase):
                 self.assertEqual(fetcher.latest_nev_retail_reading(fuel, [{'月份': '9月', '2020年': bad}], 2020), (None, None))
         self.assertEqual(fetcher.latest_nev_retail_reading(fuel, [{'月份': '8月', '2020年': 200}], 2020), (None, None))
         self.assertEqual(fetcher.latest_nev_retail_reading(fuel, total, 2021), (None, None))
-        ak = SimpleNamespace(car_market_fuel_cpca=Mock(return_value=Mock(to_dict=Mock(return_value=fuel))),
-                             car_market_total_cpca=Mock(return_value=Mock(to_dict=Mock(return_value=total))))
+        # AKShare 1.20.45 起旧名一取就抛 AttributeError，只剩 alternative_ 前缀的新名。
+        ak = SimpleNamespace(alternative_car_market_fuel_cpca=Mock(return_value=Mock(to_dict=Mock(return_value=fuel))),
+                             alternative_car_market_total_cpca=Mock(return_value=Mock(to_dict=Mock(return_value=total))))
         self.config['indicators']['new_energy_penetration'].update(last_known_date='2020-08', manual_fallback=67.0)
         with patch.object(fetcher, 'HAS_AK', True), patch.object(fetcher, 'ak', ak), patch.object(fetcher, 'CUR_YEAR', 2020):
             result = fetcher.fetch_nev_reading()
         self.assertEqual((result['value'], result['date'], result['auto_fetched']), (67.0, '2020-09', True))
-        ak.car_market_total_cpca.assert_called_once_with(symbol='狭义乘用车', indicator='零售')
-        ak.car_market_fuel_cpca.assert_called_once_with(symbol='整体市场')
+        ak.alternative_car_market_total_cpca.assert_called_once_with(symbol='狭义乘用车', indicator='零售')
+        ak.alternative_car_market_fuel_cpca.assert_called_once_with(symbol='整体市场')
+        # 1 月当年列还空着时，去年 12 月仍算自动抓到的最新一期。
+        with patch.object(fetcher, 'HAS_AK', True), patch.object(fetcher, 'ak', ak), patch.object(fetcher, 'CUR_YEAR', 2021):
+            self.assertEqual(fetcher.fetch_nev_reading()['date'], '2020-09')
         with patch.object(fetcher, 'HAS_AK', False):
             self.assertEqual(fetcher.fetch_nev_reading()['value'], 67.0)
             self.assertFalse(fetcher.fetch_nev_reading()['auto_fetched'])
+
+    def test_lpr_reads_renamed_akshare_interface_and_latest_dated_quote(self):
+        rows = [{'日期': '2020-09-20', '1年期LPR': 3.85}, {'日期': '2020-11-20', '1年期LPR': float('nan')},
+                {'日期': '2020-10-20', '1年期LPR': 3.85}, {'日期': 'bad', '1年期LPR': 9}]
+        self.assertEqual(fetcher.latest_lpr_reading(rows), (3.85, '2020-10-20'))
+        self.assertEqual(fetcher.latest_lpr_reading([{'TRADE_DATE': '2020-12-21 00:00:00', 'LPR1Y': '3.85'}]), (3.85, '2020-12-21'))
+        self.assertEqual(fetcher.latest_lpr_reading([{'日期': '2999-01-20', '1年期LPR': 1.0}]), (None, None))
+
+        class Renamed:  # 模拟 AKShare 的模块级 __getattr__：旧名直接抛
+            interest_rate_lpr_em = Mock(return_value=Mock(to_dict=Mock(return_value=rows)))
+            def __getattr__(self, name):
+                raise AttributeError(f'{name} 已更名')
+        with patch.object(fetcher, 'ak', Renamed()):
+            self.assertEqual(fetcher.ak_call('interest_rate_lpr_em', 'macro_china_lpr').to_dict('records'), rows)
+            with self.assertRaises(AttributeError):
+                fetcher.ak_call('macro_china_lpr')
+
+    def test_late_published_monthly_indicators_get_their_own_stale_window(self):
+        class Today(fetcher.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 11, 21)
+        with patch.object(fetcher, 'datetime', Today):
+            self.assertTrue(fetcher.compute_stale('2026-09', '月')['stale'])
+            self.assertFalse(fetcher.compute_stale('2026-09', '月', 80)['stale'])
+            self.assertTrue(fetcher.compute_stale('2026-08', '月', 80)['stale'])
+        self.assertEqual(self.config['indicators']['electricity']['stale_after_days'], 80)
+        self.assertEqual(self.config['indicators']['consumer_confidence']['stale_after_days'], 85)
 
     def test_fai_official_comparable_yoy_not_raw_amount_or_monthly_yoy(self):
         for title, phrase, expected, date in [

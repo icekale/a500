@@ -203,6 +203,7 @@
       "data_source": "国家能源局",
       "auto_fetch": true,
       "frequency": "月",
+      "stale_after_days": 80,
       "unit": "%",
       "reference_range": "2%~8%",
       "thresholds": [
@@ -898,6 +899,7 @@
       "data_source": "国家统计局",
       "auto_fetch": true,
       "frequency": "月",
+      "stale_after_days": 85,
       "unit": "",
       "reference_range": "92~105",
       "thresholds": [
